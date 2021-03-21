@@ -1,0 +1,15 @@
+apiVersion: batch/v1beta1
+kind: CronJob
+metadata:
+  name: infralight-k8s-fetcher
+spec:
+  schedule: "*/15 * * * *"
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          containers:
+            - name: k8s-fetcher
+              image: infralight/k8s-fetcher:1.0.0
+              imagePullPolicy: IfNotPresent
+          restartPolicy: OnFailure

@@ -1,0 +1,14 @@
+root = true
+
+[*]
+end_of_line = lf
+
+[*.{yaml,yml,json}]
+charset = utf-8
+indent_size = 2
+indent_style = space
+
+[*.go]
+charset = utf-8
+indent_size = 4
+indent_style = space
