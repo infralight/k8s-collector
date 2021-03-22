@@ -75,7 +75,7 @@ kubectl create clusterrolebinding default-view --clusterrole=view --serviceaccou
 
 6. Create the K8s CronJob for the fetcher:
 ```sh
-minikube kubectl create -f cronjob.yaml
+minikube kubectl create -f cronjob.sample.yaml
 ```
 
 7. Inspect the job using the command line or the minikube dashboard, for example:

@@ -12,4 +12,10 @@ spec:
             - name: k8s-fetcher
               image: infralight/k8s-fetcher:1.0.0
               imagePullPolicy: IfNotPresent
+              env:
+                - name: INFRALIGHT_API_KEY
+                  valueFrom:
+                    secretKeyRef:
+                      name: infralight
+                      key: apiKey
           restartPolicy: OnFailure

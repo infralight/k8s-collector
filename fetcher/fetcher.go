@@ -4,27 +4,27 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"io"
+	"net/http"
 
+	"github.com/DataDog/zstd"
+	"github.com/ido50/requests"
 	"github.com/rs/zerolog"
-	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/client-go/kubernetes"
-)
-
-const (
-	DefaultNamespace     = "default"
-	DefaultConfigMapName = "infralight-k8s-fetcher-config"
 )
 
 type Fetcher struct {
 	log           *zerolog.Logger
-	api           *kubernetes.Clientset
+	api           kubernetes.Interface
 	namespace     string
 	configMapName string
 	config        *FetcherConfig
 }
 
-func NewFetcher(log *zerolog.Logger, api *kubernetes.Clientset) *Fetcher {
+type FetcherData struct {
+	Objects []interface{} `json:"objects"`
+}
+
+func NewFetcher(log *zerolog.Logger, api kubernetes.Interface) *Fetcher {
 	return &Fetcher{
 		log:           log,
 		api:           api,
@@ -49,23 +49,14 @@ type fetchFunc struct {
 	onlyIf bool
 }
 
-func (f *Fetcher) Run(ctx context.Context, w io.Writer) error {
+func (f *Fetcher) Run(ctx context.Context) error {
 	// load our configuration from a ConfigMap
 	err := f.loadConfig(ctx)
 	if err != nil {
-		if errors.IsNotFound(err) {
-			// configuration doesn't exist, warn but do not fail, we'll use our
-			// defaults
-			f.log.Warn().
-				Str("namespace", f.namespace).
-				Str("config_map_name", f.configMapName).
-				Msg("ConfigMap doesn't exist, using defaults")
-		} else {
-			return fmt.Errorf("failed loading configuration map: %w", err)
-		}
+		return fmt.Errorf("failed loading configuration map: %w", err)
 	}
 
-	enc := json.NewEncoder(w)
+	var objects []interface{} // nolint: prealloc
 
 	for _, fn := range []fetchFunc{
 		{"ClusterRole", f.getClusterRoles, f.config.FetchClusterRoles},
@@ -105,17 +96,47 @@ func (f *Fetcher) Run(ctx context.Context, w io.Writer) error {
 			continue
 		}
 
-		err = enc.Encode(map[string]interface{}{
-			"kind":  fn.kind,
-			"items": items,
-		})
-		if err != nil {
-			// can't write JSON? consider this fatal
-			f.log.Panic().
-				Err(err).
-				Str("kind", fn.kind).
-				Msg("Failed writing data")
-		}
+		objects = append(objects, items...)
+	}
+
+	// start building an HTTP request to send the data to the Infralight API
+	req := requests.NewClient(f.config.Endpoint).
+		Header("Authorization", fmt.Sprintf("Bearer %s", f.config.APIKey)).
+		NewRequest("POST", "").
+		ExpectedStatus(http.StatusNoContent)
+	if err != nil {
+		return fmt.Errorf("failed sending data to %s: %w", f.config.Endpoint, err)
+	}
+
+	// encode data to JSON
+	rawBody, err := json.Marshal(FetcherData{objects})
+	if err != nil {
+		return fmt.Errorf("failed encoding to JSON: %w", err)
+	}
+
+	f.log.Debug().
+		Bytes("body", rawBody).
+		Msg("Sending data to Infralight")
+
+	// compress data with zstd. if this fails, we'll still send, but uncompressed
+	compressedBody, err := zstd.CompressLevel(nil, rawBody, 10)
+	if err != nil {
+		f.log.Warn().
+			Err(err).
+			Msg("Failed compressing data, will send uncompressed")
+
+		req.Body(rawBody, "application/json")
+	} else {
+		req.
+			Header("Content-Encoding", "zstd").
+			Body(compressedBody, "application/json")
+	}
+
+	// send the request, we will fail unless the server returned the expected
+	// status (204 no content)
+	err = req.Run()
+	if err != nil {
+		return fmt.Errorf("failed sending data to Infralight: %w", err)
 	}
 
 	return nil

@@ -3,6 +3,7 @@ kind: ConfigMap
 metadata:
   name: infralight-k8s-fetcher-config
 data:
+  endpoint: https://api.infralight.co/k8s
   fetcher.watchNamespace: default
   fetcher.ignoreNamespaces: |
     kube-system

@@ -2,13 +2,31 @@ package fetcher
 
 import (
 	"context"
+	"errors"
+	"fmt"
+	"os"
 	"strconv"
 	"strings"
 
+	v1 "k8s.io/api/core/v1"
+	k8serr "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
+const (
+	APIKeyEnvVar         = "INFRALIGHT_API_KEY"
+	DefaultEndpoint      = "https://api.infralight.co/k8s"
+	DefaultNamespace     = "default"
+	DefaultConfigMapName = "infralight-k8s-fetcher-config"
+)
+
+var (
+	ErrAPIKey = errors.New("API key must be provided")
+)
+
 type FetcherConfig struct {
+	APIKey                      string
+	Endpoint                    string
 	Namespace                   string
 	IgnoreNamespaces            []string
 	FetchEvents                 bool
@@ -33,14 +51,36 @@ type FetcherConfig struct {
 }
 
 func (f *Fetcher) loadConfig(ctx context.Context) error {
+	// load Infralight API Key from the environment, this is required
+	apiKey := os.Getenv(APIKeyEnvVar)
+	if apiKey == "" {
+		return ErrAPIKey
+	}
+
+	// now load our optional ConfigMap from Kubernetes
 	config, err := f.api.CoreV1().
 		ConfigMaps(f.namespace).
 		Get(ctx, f.configMapName, metav1.GetOptions{})
 	if err != nil {
-		return err
+		if k8serr.IsNotFound(err) {
+			// configuration doesn't exist, warn but do not fail, we'll use our
+			// defaults
+			f.log.Warn().
+				Str("namespace", f.namespace).
+				Str("config_map_name", f.configMapName).
+				Msg("ConfigMap doesn't exist, using defaults")
+
+			config = &v1.ConfigMap{
+				Data: make(map[string]string),
+			}
+		} else {
+			return fmt.Errorf("failed loading ConfigMap: %w", err)
+		}
 	}
 
 	f.config = &FetcherConfig{
+		APIKey:                      apiKey,
+		Endpoint:                    parseOne(config.Data["endpoint"], DefaultEndpoint),
 		Namespace:                   parseOne(config.Data["fetcher.watchNamespace"], ""),
 		IgnoreNamespaces:            parseMultiple(config.Data["fetcher.ignoreNamespaces"], nil),
 		FetchEvents:                 parseBool(config.Data["fetcher.resources.events"], true),

@@ -57,7 +57,7 @@ func main() {
 
 	f := fetcher.NewFetcher(&log.Logger, api)
 
-	err = f.Run(context.TODO(), os.Stdout)
+	err = f.Run(context.TODO())
 	if err != nil {
 		log.Fatal().
 			Err(err).
