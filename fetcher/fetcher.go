@@ -3,105 +3,120 @@ package fetcher
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"io"
 
 	"github.com/rs/zerolog"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/client-go/kubernetes"
 )
 
-const ConfigMapName = "infralight-fetcher-config"
+const (
+	DefaultNamespace     = "default"
+	DefaultConfigMapName = "infralight-k8s-fetcher-config"
+)
 
 type Fetcher struct {
-	log *zerolog.Logger
-	api *kubernetes.Clientset
+	log           *zerolog.Logger
+	api           *kubernetes.Clientset
+	namespace     string
+	configMapName string
+	config        *FetcherConfig
 }
 
 func NewFetcher(log *zerolog.Logger, api *kubernetes.Clientset) *Fetcher {
 	return &Fetcher{
-		log: log,
-		api: api,
+		log:           log,
+		api:           api,
+		namespace:     DefaultNamespace,
+		configMapName: DefaultConfigMapName,
 	}
 }
 
+func (f *Fetcher) SetNamespace(ns string) *Fetcher {
+	f.namespace = ns
+	return f
+}
+
+func (f *Fetcher) SetConfigMapName(name string) *Fetcher {
+	f.configMapName = name
+	return f
+}
+
 type fetchFunc struct {
-	name string
-	fn   func(context.Context) (interface{}, error)
+	kind   string
+	fn     func(context.Context) (items []interface{}, err error)
+	onlyIf bool
 }
 
 func (f *Fetcher) Run(ctx context.Context, w io.Writer) error {
+	// load our configuration from a ConfigMap
+	err := f.loadConfig(ctx)
+	if err != nil {
+		if errors.IsNotFound(err) {
+			// configuration doesn't exist, warn but do not fail, we'll use our
+			// defaults
+			f.log.Warn().
+				Str("namespace", f.namespace).
+				Str("config_map_name", f.configMapName).
+				Msg("ConfigMap doesn't exist, using defaults")
+		} else {
+			return fmt.Errorf("failed loading configuration map: %w", err)
+		}
+	}
+
 	enc := json.NewEncoder(w)
 
 	for _, fn := range []fetchFunc{
-		{"nodes", f.getNodes},
-		{"namespaces", f.getNamespaces},
-		{"config_maps", f.getConfigMaps},
-		{"replication_controllers", f.getReplicationControllers},
-		{"events", f.getEvents},
-		{"services", f.getServices},
-		{"service_accounts", f.getServiceAccounts},
-		{"pods", f.getPods},
-		{"persistent_volumes", f.getPersistentVolumes},
-		{"persistent_volume_claims", f.getPersistentVolumeClaims},
+		{"ClusterRole", f.getClusterRoles, f.config.FetchClusterRoles},
+		{"ConfigMap", f.getConfigMaps, f.config.FetchConfigMaps},
+		{"CronJob", f.getCronJobs, f.config.FetchCronJobs},
+		{"Event", f.getEvents, f.config.FetchEvents},
+		{"DaemonSet", f.getDaemonSets, f.config.FetchDaemonSets},
+		{"Deployment", f.getDeployments, f.config.FetchDeployments},
+		{"Ingress", f.getIngresses, f.config.FetchIngresses},
+		{"Job", f.getJobs, f.config.FetchJobs},
+		{"Namespace", f.getNamespaces, f.config.FetchNamespaces},
+		{"Node", f.getNodes, f.config.FetchNodes},
+		{"ReplicaSet", f.getReplicaSets, f.config.FetchReplicaSets},
+		{"ReplicationController", f.getReplicationControllers, f.config.FetchReplicationControllers},
+		{"ServiceAccount", f.getServiceAccounts, f.config.FetchServiceAccounts},
+		{"Service", f.getServices, f.config.FetchServices},
+		{"Secret", f.getSecrets, f.config.FetchSecrets},
+		{"StatefulSet", f.getStatefulSet, f.config.FetchStatefulSets},
+		{"PersistentVolumeClaim", f.getPersistentVolumeClaims, f.config.FetchPersistentVolumeClaims},
+		{"PersistentVolume", f.getPersistentVolumes, f.config.FetchPersistentVolumes},
+		{"Pod", f.getPods, f.config.FetchPods},
 	} {
-		data, err := fn.fn(ctx)
+		if !fn.onlyIf {
+			continue
+		}
+
+		items, err := fn.fn(ctx)
 		if err != nil {
 			f.log.Warn().
 				Err(err).
-				Str("func", fn.name).
+				Str("kind", fn.kind).
 				Msg("Fetcher function failed")
 			continue
 		}
 
-		err = enc.Encode(map[string]interface{}{fn.name: data})
+		if len(items) == 0 {
+			continue
+		}
+
+		err = enc.Encode(map[string]interface{}{
+			"kind":  fn.kind,
+			"items": items,
+		})
 		if err != nil {
 			// can't write JSON? consider this fatal
 			f.log.Panic().
 				Err(err).
-				Str("func", fn.name).
+				Str("kind", fn.kind).
 				Msg("Failed writing data")
 		}
 	}
 
 	return nil
-}
-
-func (f *Fetcher) getNamespaces(ctx context.Context) (data interface{}, err error) {
-	return f.api.CoreV1().Namespaces().List(ctx, metav1.ListOptions{})
-}
-
-func (f *Fetcher) getPods(ctx context.Context) (data interface{}, err error) {
-	return f.api.CoreV1().Pods("").List(ctx, metav1.ListOptions{})
-}
-
-func (f *Fetcher) getEvents(ctx context.Context) (data interface{}, err error) {
-	return f.api.CoreV1().Events("").List(ctx, metav1.ListOptions{})
-}
-
-func (f *Fetcher) getConfigMaps(ctx context.Context) (data interface{}, err error) {
-	return f.api.CoreV1().ConfigMaps("").List(ctx, metav1.ListOptions{})
-}
-
-func (f *Fetcher) getReplicationControllers(ctx context.Context) (data interface{}, err error) {
-	return f.api.CoreV1().ReplicationControllers("").List(ctx, metav1.ListOptions{})
-}
-
-func (f *Fetcher) getNodes(ctx context.Context) (data interface{}, err error) {
-	return f.api.CoreV1().Nodes().List(ctx, metav1.ListOptions{})
-}
-
-func (f *Fetcher) getServices(ctx context.Context) (data interface{}, err error) {
-	return f.api.CoreV1().Services("").List(ctx, metav1.ListOptions{})
-}
-
-func (f *Fetcher) getServiceAccounts(ctx context.Context) (data interface{}, err error) {
-	return f.api.CoreV1().ServiceAccounts("").List(ctx, metav1.ListOptions{})
-}
-
-func (f *Fetcher) getPersistentVolumes(ctx context.Context) (data interface{}, err error) {
-	return f.api.CoreV1().PersistentVolumes().List(ctx, metav1.ListOptions{})
-}
-
-func (f *Fetcher) getPersistentVolumeClaims(ctx context.Context) (data interface{}, err error) {
-	return f.api.CoreV1().PersistentVolumeClaims("").List(ctx, metav1.ListOptions{})
 }
