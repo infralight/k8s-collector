@@ -5,86 +5,201 @@
 <!-- vim-markdown-toc GFM -->
 
 * [Overview](#overview)
+* [Configuration](#configuration)
+* [OCI Image](#oci-image)
+* [Server-Side Notes](#server-side-notes)
 * [Production Set-Up](#production-set-up)
     * [Requirements](#requirements)
-* [Local Development (Out-of-Cluster)](#local-development-out-of-cluster)
-    * [Requirements](#requirements-1)
     * [Quick Start](#quick-start)
-* [Local Development (In-Cluster)](#local-development-in-cluster)
-    * [Requirements](#requirements-2)
+* [Local Development](#local-development)
+    * [Requirements](#requirements-1)
+    * [Unit Tests and Static Code Analysis](#unit-tests-and-static-code-analysis)
     * [Quick Start](#quick-start-1)
 
 <!-- vim-markdown-toc -->
 
 ## Overview
 
-This repository contains Infralight's Kubernetes Fetcher, which is a Go program
-meant to run as a Kubernetes Cron Job, collecting information from a K8s cluster
-and sending it to the Infralight SaaS for storage.
+This repository contains Infralight's Kubernetes Fetcher, which collects
+information from a customer's Kubernetes cluster and sends it to the Infralight
+SaaS. This means it is an on-premises component.
+
+The fetcher is implemented in the [Go programming language](https://golang.org/) and packaged as an
+[OCI image](https://github.com/opencontainers/image-spec). It uses the official [Go client](https://github.com/kubernetes/client-go) provided by the
+Kubernetes project for the benefits it provides over manually accessing the
+Kubernetes API.
+
+The fetcher is currently implemented as a job meant to be run as a Kubernetes
+[CronJob](https://kubernetes.io/docs/tasks/job/automated-tasks-with-cron-jobs/). While this means the job's execution interval is at the discretion
+of the customer, this provides the ability to trigger the job manually at any
+given time without having to restart or add triggering capabilities to a
+Kubernetes [Deployment](https://kubernetes.io/docs/concepts/workloads/controllers/deployment/).
+
+The fetcher collects various objects from the Kubernetes cluster and sends them
+as-is to Infralight. Currently, the set of object types collected is hard-coded,
+but logic may be added to the fetcher to receive instructions from Infralight
+to fetch more objects, or to use the Go client's [discovery](https://pkg.go.dev/k8s.io/client-go@v1.5.2/1.5/discovery) library
+to fetch objects of other types.
+
+## Configuration
+
+The fetcher must be configured with an Infralight-provided API key in order to
+be able to send data to Infralight. This key should be provided as an environment
+variable called `INFRALIGHT_API_KEY`, and it is recommended that this key is
+stored as a Kubernetes [Secret](https://kubernetes.io/docs/concepts/configuration/secret/) and automatically injected into the fetcher's pod.
+A sample secret template is included in the [secret.sample.yaml](secret.sample.yaml) file.
+
+The fetcher's behavior may also be configured and modified via an optional
+Kubernetes [ConfigMap](https://kubernetes.io/docs/concepts/configuration/configmap/). This allows changing the HTTP endpoint to which data
+is sent, enable/disable the collection of object types, and more. Currently,
+this ConfigMap must be named "infralight-k8s-fetcher-config" to be accepted by
+the fetcher. A sample template is included in the [configmap.sample.yaml](configmap.sample.yaml) file.
+
+If a ConfigMap does not exist, default configuration options will be used. By
+default, secrets will _not_ be collected, but all other supported object types
+will. See [here](https://github.com/infralight/k8s-fetcher/blob/main/fetcher/config.go#L81) for a list of supported configuration options and their
+default values.
+
+## OCI Image
+
+A standard [Dockerfile](Dockerfile) is included to package the fetcher as an OCI image.
+This Dockerfile uses the official [Alpine-based Go image](https://hub.docker.com/_/golang) from Docker Hub
+with a [multi-stage build](https://docs.docker.com/develop/develop-images/multistage-build/) process to compile the fetcher into a
+[statically-linked binary](https://en.wikipedia.org/wiki/Static_library). The resulting image does not use any base layer,
+thus keeping its size as small as possible.
+
+The image is named `infralight/k8s-fetcher`.
+
+## Server-Side Notes
+
+The fetcher sends the collected objects to the Infralight endpoint serialized
+via JSON. Requests will be compressed using the [zstd](https://facebook.github.io/zstd/) algorithm, unless
+compression fails, in which case no compression will be used. The server MUST
+inspect the contents of the `Content-Encoding` request header to check whether
+the request body is compressed or not, and only attempt to decompress using
+`zstd` if the header's value is `"zstd"`.
+
+The JSON format of each request is as follows:
+
+```json
+{
+    "objects": [
+        { "kind": "Pod", "metadata": { "name": "bla", "namespace": "default" } },
+        { "kind": "CronJob", "metadata": { "name": "bla", "namespace": "default" } }
+    ]
+}
+```
+
+The format of object types themselves is generally consistent, and is documented
+[here](https://pkg.go.dev/k8s.io/api/core/v1). See [this](https://pkg.go.dev/k8s.io/api/core/v1#Pod) for an example of the structure of an object of type
+Pod.
+
+When a request is handled by the Infralight endpoint, it is expected to return
+a [204 No Content](https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/204) response with no body, unless an error has occurred.
 
 ## Production Set-Up
+
+In production, the fetcher should be configured as a Kubernetes [CronJob](https://kubernetes.io/docs/concepts/workloads/controllers/cron-jobs/),
+and provided access to collect information from the cluster via a
+[service account](https://kubernetes.io/docs/tasks/configure-pod-container/configure-service-account/).
+
+A sample [cronjob.sample.yaml](cronjob.sample.yaml) file is included in the repository.
 
 ### Requirements
 
 * [Kubernetes](https://kubernetes.io/) v1.15+
 * [kubectl](https://kubernetes.io/docs/tasks/tools/#kubectl) v1.18+
 
-## Local Development (Out-of-Cluster)
-
-### Requirements
-
-* [Go](https://golang.org/) v1.16+
-* [kubectl](https://kubernetes.io/docs/tasks/tools/#kubectl) v1.18+
-
 ### Quick Start
 
-```sh
-go run main.go -external ~/.kube/config -debug
-```
-
-## Local Development (In-Cluster)
-
-### Requirements
-
-* [Docker](https://www.docker.com/) v20.10+
-* [minikube](https://minikube.sigs.k8s.io/docs/) v1.18+
-
-### Quick Start
-
-1. Make sure the Docker daemon is running.
-
-2. Start minikube on top of Docker:
-```sh
-minikube start --driver=docker
-```
-
-3. Load environment variables so the Docker client works against the local minikube dockerd:
-```sh
-eval $(minikube docker-env)
-```
-
-4. Build the fetcher's Docker image:
-```sh
-docker build -t infralight/k8s-fetcher:1.0.0 .
-```
-
-5. Grant the default service account access to view the cluster:
+1. Grant the default service account access to view the cluster:
 ```sh
 kubectl create clusterrolebinding default-view --clusterrole=view --serviceaccount=default:default
 ```
 
-6. Create the K8s CronJob for the fetcher:
+2. Create the K8s CronJob for the fetcher:
 ```sh
-minikube kubectl create -f cronjob.sample.yaml
+kubectl create -f cronjob.sample.yaml
 ```
 
-7. Inspect the job using the command line or the minikube dashboard, for example:
+3. Inspect the job using the command line:
 ```sh
-minikube kubectl get cronjob infralight-k8s-fetcher
+kubectl get jobs --watch
 ```
 
-8. Cleanup:
+The sample file triggers the job at 15 minute intervals.
+
+## Local Development
+
+During development, the fetcher may be run outside of the cluster without
+having to package it in an image, or inside the cluster. It is recommended to
+use `minikube` for local development.
+
+### Requirements
+
+* [Go](https://golang.org/) v1.16+
+* [Docker](https://www.docker.com/) v20.10+
+* [minikube](https://minikube.sigs.k8s.io/docs/) v1.18+
+* [kubectl](https://kubernetes.io/docs/tasks/tools/#kubectl) v1.18+
+* [golangci-lint](https://golangci-lint.run/) v1.35+
+
+### Unit Tests and Static Code Analysis
+
+The fetcher includes standard Go unit tests, and uses [golangci-lint](https://golangci-lint.run/) to run a
+comprehensive suite of static code analysis tools. The GitHub repository is set-up
+to compile the fetcher, run the unit tests and execute the static code analysis
+tools on every commit. The Dockerfile is also set-up to do the same thing when
+building the image.
+
+Locally, these steps can be executed like so:
+
 ```sh
-minikube kubectl delete cronjob infralight-k8s-fetcher
-eval $(minikube docker-env -u)
+$ go build
+$ go test ./...
+$ golangci-lint run ./...
 ```
+
+### Quick Start
+1. Make sure the Docker daemon is running.
+2. Start minikube on top of Docker:
+    ```sh
+    minikube start --driver=docker
+    ```
+3. Grant the default service account access to view the cluster:
+    ```sh
+    minikube kubectl create clusterrolebinding default-view --clusterrole=view --serviceaccount=default:default
+    ```
+4. Create the ConfigMap for the fetcher, if needed:
+    ```sh
+    minikube kubectl create -f configmap.sample.yaml
+    ```
+5. To run the fetcher out-of-cluster, execute:
+    ```sh
+    INFRALIGHT_API_KEY=key go run main.go -external ~/.kube/config -debug
+    ```
+6. To run the fetcher in-cluster, more steps are required:
+    1. Load environment variables so the Docker client works against the local `minikube` Docker daemon:
+        ```sh
+        eval $(minikube docker-env)
+        ```
+    2. Build the fetcher's Docker image:
+        ```sh
+        docker build -t infralight/k8s-fetcher:1.0.0 .
+        ```
+    3. Create the secret containing the API key:
+        ```sh
+        minikube kubectl create -f secret.sampl.yaml
+        ```
+    4. Create the K8s CronJob for the fetcher:
+        ```sh
+        minikube kubectl create -f cronjob.sample.yaml
+        ```
+    5. Inspect the job using the command line or the minikube Dashboard:
+        ```sh
+        minikube dashboard
+        ```
+    6. Cleanup:
+        ```sh
+        minikube kubectl delete cronjob infralight-k8s-fetcher
+        eval $(minikube docker-env -u)
+        ```
