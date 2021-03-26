@@ -1,4 +1,4 @@
-package fetcher
+package collector
 
 import (
 	"context"
@@ -17,14 +17,14 @@ const (
 	APIKeyEnvVar         = "INFRALIGHT_API_KEY"
 	DefaultEndpoint      = "https://api.infralight.co/k8s"
 	DefaultNamespace     = "default"
-	DefaultConfigMapName = "infralight-k8s-fetcher-config"
+	DefaultConfigMapName = "infralight-k8s-collector-config"
 )
 
 var (
 	ErrAPIKey = errors.New("API key must be provided")
 )
 
-type FetcherConfig struct {
+type CollectorConfig struct {
 	APIKey                      string
 	Endpoint                    string
 	Namespace                   string
@@ -50,7 +50,7 @@ type FetcherConfig struct {
 	FetchClusterRoles           bool
 }
 
-func (f *Fetcher) loadConfig(ctx context.Context) error {
+func (f *Collector) loadConfig(ctx context.Context) error {
 	// load Infralight API Key from the environment, this is required
 	apiKey := os.Getenv(APIKeyEnvVar)
 	if apiKey == "" {
@@ -78,30 +78,30 @@ func (f *Fetcher) loadConfig(ctx context.Context) error {
 		}
 	}
 
-	f.config = &FetcherConfig{
+	f.config = &CollectorConfig{
 		APIKey:                      apiKey,
 		Endpoint:                    parseOne(config.Data["endpoint"], DefaultEndpoint),
-		Namespace:                   parseOne(config.Data["fetcher.watchNamespace"], ""),
-		IgnoreNamespaces:            parseMultiple(config.Data["fetcher.ignoreNamespaces"], nil),
-		FetchEvents:                 parseBool(config.Data["fetcher.resources.events"], true),
-		FetchReplicationControllers: parseBool(config.Data["fetcher.resources.replicationControllers"], true),
-		FetchServices:               parseBool(config.Data["fetcher.resources.services"], true),
-		FetchServiceAccounts:        parseBool(config.Data["fetcher.resources.serviceAccounts"], true),
-		FetchPods:                   parseBool(config.Data["fetcher.resources.pods"], true),
-		FetchNodes:                  parseBool(config.Data["fetcher.resources.nodes"], true),
-		FetchPersistentVolumes:      parseBool(config.Data["fetcher.resources.persistentVolumes"], true),
-		FetchPersistentVolumeClaims: parseBool(config.Data["fetcher.resources.persistentVolumeClaims"], true),
-		FetchNamespaces:             parseBool(config.Data["fetcher.resources.namespaces"], true),
-		FetchConfigMaps:             parseBool(config.Data["fetcher.resources.configMaps"], true),
-		FetchSecrets:                parseBool(config.Data["fetcher.resources.secrets"], false),
-		FetchDeployments:            parseBool(config.Data["fetcher.resources.deployments"], true),
-		FetchDaemonSets:             parseBool(config.Data["fetcher.resources.daemonSets"], true),
-		FetchReplicaSets:            parseBool(config.Data["fetcher.resources.replicaSets"], true),
-		FetchStatefulSets:           parseBool(config.Data["fetcher.resources.statefulSets"], true),
-		FetchJobs:                   parseBool(config.Data["fetcher.resources.jobs"], true),
-		FetchCronJobs:               parseBool(config.Data["fetcher.resources.cronJobs"], true),
-		FetchIngresses:              parseBool(config.Data["fetcher.resources.ingresses"], true),
-		FetchClusterRoles:           parseBool(config.Data["fetcher.resources.clusterRoles"], true),
+		Namespace:                   parseOne(config.Data["collector.watchNamespace"], ""),
+		IgnoreNamespaces:            parseMultiple(config.Data["collector.ignoreNamespaces"], nil),
+		FetchEvents:                 parseBool(config.Data["collector.resources.events"], true),
+		FetchReplicationControllers: parseBool(config.Data["collector.resources.replicationControllers"], true),
+		FetchServices:               parseBool(config.Data["collector.resources.services"], true),
+		FetchServiceAccounts:        parseBool(config.Data["collector.resources.serviceAccounts"], true),
+		FetchPods:                   parseBool(config.Data["collector.resources.pods"], true),
+		FetchNodes:                  parseBool(config.Data["collector.resources.nodes"], true),
+		FetchPersistentVolumes:      parseBool(config.Data["collector.resources.persistentVolumes"], true),
+		FetchPersistentVolumeClaims: parseBool(config.Data["collector.resources.persistentVolumeClaims"], true),
+		FetchNamespaces:             parseBool(config.Data["collector.resources.namespaces"], true),
+		FetchConfigMaps:             parseBool(config.Data["collector.resources.configMaps"], true),
+		FetchSecrets:                parseBool(config.Data["collector.resources.secrets"], false),
+		FetchDeployments:            parseBool(config.Data["collector.resources.deployments"], true),
+		FetchDaemonSets:             parseBool(config.Data["collector.resources.daemonSets"], true),
+		FetchReplicaSets:            parseBool(config.Data["collector.resources.replicaSets"], true),
+		FetchStatefulSets:           parseBool(config.Data["collector.resources.statefulSets"], true),
+		FetchJobs:                   parseBool(config.Data["collector.resources.jobs"], true),
+		FetchCronJobs:               parseBool(config.Data["collector.resources.cronJobs"], true),
+		FetchIngresses:              parseBool(config.Data["collector.resources.ingresses"], true),
+		FetchClusterRoles:           parseBool(config.Data["collector.resources.clusterRoles"], true),
 	}
 
 	f.log.Debug().Interface("map", f.config).Msg("Loaded config map")
@@ -109,7 +109,7 @@ func (f *Fetcher) loadConfig(ctx context.Context) error {
 	return nil
 }
 
-func (config *FetcherConfig) ignoreNamespace(ns string) bool {
+func (config *CollectorConfig) ignoreNamespace(ns string) bool {
 	if config.Namespace != "" && ns != config.Namespace {
 		return false
 	}

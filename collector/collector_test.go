@@ -1,4 +1,4 @@
-package fetcher
+package collector
 
 import (
 	"context"
@@ -127,7 +127,7 @@ func TestRun(t *testing.T) {
 
 			defer ts.Close()
 
-			// Add a ConfigMap that points the fetcher to talk to the mock
+			// Add a ConfigMap that points the collector to talk to the mock
 			// HTTP server
 			test.objs = append(test.objs, &v1.ConfigMap{
 				TypeMeta: metav1.TypeMeta{
@@ -138,19 +138,19 @@ func TestRun(t *testing.T) {
 					Namespace: "default",
 				},
 				Data: map[string]string{
-					"endpoint":                     ts.URL,
-					"fetcher.resources.configMaps": "false",
+					"endpoint":                       ts.URL,
+					"collector.resources.configMaps": "false",
 				},
 			})
 
 			// Create a fake Kubernetes client
 			client := fake.NewSimpleClientset(test.objs...)
 
-			// create a fetcher instance
+			// create a collector instance
 			os.Setenv(APIKeyEnvVar, test.testAPIKey)
-			f := NewFetcher(&logger, client)
+			f := NewCollector(&logger, client)
 
-			// run the fetcher
+			// run the collector
 			err := f.Run(context.Background())
 			if test.expErr {
 				assert.MustNotBeNil(t, err, "error must not be nil")

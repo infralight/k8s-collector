@@ -1,6 +1,6 @@
 # ![Infralight Logo](project-logo.png)
 
-**Infralight Kubernetes Fetcher**
+**Infralight Kubernetes Collector**
 
 <!-- vim-markdown-toc GFM -->
 
@@ -20,59 +20,59 @@
 
 ## Overview
 
-This repository contains Infralight's Kubernetes Fetcher, which collects
+This repository contains Infralight's Kubernetes Collector, which collects
 information from a customer's Kubernetes cluster and sends it to the Infralight
 SaaS. This means it is an on-premises component.
 
-The fetcher is implemented in the [Go programming language](https://golang.org/) and packaged as an
+The collector is implemented in the [Go programming language](https://golang.org/) and packaged as an
 [OCI image](https://github.com/opencontainers/image-spec). It uses the official [Go client](https://github.com/kubernetes/client-go) provided by the
 Kubernetes project for the benefits it provides over manually accessing the
 Kubernetes API.
 
-The fetcher is currently implemented as a job meant to be run as a Kubernetes
+The collector is currently implemented as a job meant to be run as a Kubernetes
 [CronJob](https://kubernetes.io/docs/tasks/job/automated-tasks-with-cron-jobs/). While this means the job's execution interval is at the discretion
 of the customer, this provides the ability to trigger the job manually at any
 given time without having to restart or add triggering capabilities to a
 Kubernetes [Deployment](https://kubernetes.io/docs/concepts/workloads/controllers/deployment/).
 
-The fetcher collects various objects from the Kubernetes cluster and sends them
+The collector collects various objects from the Kubernetes cluster and sends them
 as-is to Infralight. Currently, the set of object types collected is hard-coded,
-but logic may be added to the fetcher to receive instructions from Infralight
+but logic may be added to the collector to receive instructions from Infralight
 to fetch more objects, or to use the Go client's [discovery](https://pkg.go.dev/k8s.io/client-go@v1.5.2/1.5/discovery) library
 to fetch objects of other types.
 
 ## Configuration
 
-The fetcher must be configured with an Infralight-provided API key in order to
+The collector must be configured with an Infralight-provided API key in order to
 be able to send data to Infralight. This key should be provided as an environment
 variable called `INFRALIGHT_API_KEY`, and it is recommended that this key is
-stored as a Kubernetes [Secret](https://kubernetes.io/docs/concepts/configuration/secret/) and automatically injected into the fetcher's pod.
+stored as a Kubernetes [Secret](https://kubernetes.io/docs/concepts/configuration/secret/) and automatically injected into the collector's pod.
 A sample secret template is included in the [secret.sample.yaml](secret.sample.yaml) file.
 
-The fetcher's behavior may also be configured and modified via an optional
+The collector's behavior may also be configured and modified via an optional
 Kubernetes [ConfigMap](https://kubernetes.io/docs/concepts/configuration/configmap/). This allows changing the HTTP endpoint to which data
 is sent, enable/disable the collection of object types, and more. Currently,
-this ConfigMap must be named "infralight-k8s-fetcher-config" to be accepted by
-the fetcher. A sample template is included in the [configmap.sample.yaml](configmap.sample.yaml) file.
+this ConfigMap must be named "infralight-k8s-collector-config" to be accepted by
+the collector. A sample template is included in the [configmap.sample.yaml](configmap.sample.yaml) file.
 
 If a ConfigMap does not exist, default configuration options will be used. By
 default, secrets will _not_ be collected, but all other supported object types
-will. See [here](https://github.com/infralight/k8s-fetcher/blob/main/fetcher/config.go#L81) for a list of supported configuration options and their
+will. See [here](https://github.com/infralight/k8s-collector/blob/main/collector/config.go#L81) for a list of supported configuration options and their
 default values.
 
 ## OCI Image
 
-A standard [Dockerfile](Dockerfile) is included to package the fetcher as an OCI image.
+A standard [Dockerfile](Dockerfile) is included to package the collector as an OCI image.
 This Dockerfile uses the official [Alpine-based Go image](https://hub.docker.com/_/golang) from Docker Hub
-with a [multi-stage build](https://docs.docker.com/develop/develop-images/multistage-build/) process to compile the fetcher into a
+with a [multi-stage build](https://docs.docker.com/develop/develop-images/multistage-build/) process to compile the collector into a
 [statically-linked binary](https://en.wikipedia.org/wiki/Static_library). The resulting image does not use any base layer,
 thus keeping its size as small as possible.
 
-The image is named `infralight/k8s-fetcher`.
+The image is named `infralight/k8s-collector`.
 
 ## Server-Side Notes
 
-The fetcher sends the collected objects to the Infralight endpoint serialized
+The collector sends the collected objects to the Infralight endpoint serialized
 via JSON. Requests will be compressed using the [zstd](https://facebook.github.io/zstd/) algorithm, unless
 compression fails, in which case no compression will be used. The server MUST
 inspect the contents of the `Content-Encoding` request header to check whether
@@ -99,7 +99,7 @@ a [204 No Content](https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/204)
 
 ## Production Set-Up
 
-In production, the fetcher should be configured as a Kubernetes [CronJob](https://kubernetes.io/docs/concepts/workloads/controllers/cron-jobs/),
+In production, the collector should be configured as a Kubernetes [CronJob](https://kubernetes.io/docs/concepts/workloads/controllers/cron-jobs/),
 and provided access to collect information from the cluster via a
 [service account](https://kubernetes.io/docs/tasks/configure-pod-container/configure-service-account/).
 
@@ -117,7 +117,7 @@ A sample [cronjob.sample.yaml](cronjob.sample.yaml) file is included in the repo
 kubectl create clusterrolebinding default-view --clusterrole=view --serviceaccount=default:default
 ```
 
-2. Create the K8s CronJob for the fetcher:
+2. Create the K8s CronJob for the collector:
 ```sh
 kubectl create -f cronjob.sample.yaml
 ```
@@ -131,7 +131,7 @@ The sample file triggers the job at 15 minute intervals.
 
 ## Local Development
 
-During development, the fetcher may be run outside of the cluster without
+During development, the collector may be run outside of the cluster without
 having to package it in an image, or inside the cluster. It is recommended to
 use `minikube` for local development.
 
@@ -145,9 +145,9 @@ use `minikube` for local development.
 
 ### Unit Tests and Static Code Analysis
 
-The fetcher includes standard Go unit tests, and uses [golangci-lint](https://golangci-lint.run/) to run a
+The collector includes standard Go unit tests, and uses [golangci-lint](https://golangci-lint.run/) to run a
 comprehensive suite of static code analysis tools. The GitHub repository is set-up
-to compile the fetcher, run the unit tests and execute the static code analysis
+to compile the collector, run the unit tests and execute the static code analysis
 tools on every commit. The Dockerfile is also set-up to do the same thing when
 building the image.
 
@@ -169,28 +169,28 @@ $ golangci-lint run ./...
     ```sh
     minikube kubectl create clusterrolebinding default-view --clusterrole=view --serviceaccount=default:default
     ```
-4. Create the ConfigMap for the fetcher, if needed:
+4. Create the ConfigMap for the collector, if needed:
     ```sh
     minikube kubectl create -f configmap.sample.yaml
     ```
-5. To run the fetcher out-of-cluster, execute:
+5. To run the collector out-of-cluster, execute:
     ```sh
     INFRALIGHT_API_KEY=key go run main.go -external ~/.kube/config -debug
     ```
-6. To run the fetcher in-cluster, more steps are required:
+6. To run the collector in-cluster, more steps are required:
     1. Load environment variables so the Docker client works against the local `minikube` Docker daemon:
         ```sh
         eval $(minikube docker-env)
         ```
-    2. Build the fetcher's Docker image:
+    2. Build the collector's Docker image:
         ```sh
-        docker build -t infralight/k8s-fetcher:1.0.0 .
+        docker build -t infralight/k8s-collector:1.0.0 .
         ```
     3. Create the secret containing the API key:
         ```sh
         minikube kubectl create -f secret.sampl.yaml
         ```
-    4. Create the K8s CronJob for the fetcher:
+    4. Create the K8s CronJob for the collector:
         ```sh
         minikube kubectl create -f cronjob.sample.yaml
         ```
@@ -200,6 +200,6 @@ $ golangci-lint run ./...
         ```
     6. Cleanup:
         ```sh
-        minikube kubectl delete cronjob infralight-k8s-fetcher
+        minikube kubectl delete cronjob infralight-k8s-collector
         eval $(minikube docker-env -u)
         ```

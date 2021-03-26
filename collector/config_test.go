@@ -1,4 +1,4 @@
-package fetcher
+package collector
 
 import (
 	"context"
@@ -23,7 +23,7 @@ func Test_loadConfig(t *testing.T) {
 		apiKey    string
 		objs      []runtime.Object
 		expErr    error
-		expConfig FetcherConfig
+		expConfig CollectorConfig
 	}{
 		{
 			name:   "no secret, no config",
@@ -32,7 +32,7 @@ func Test_loadConfig(t *testing.T) {
 		{
 			name:   "secret, no config",
 			apiKey: "bla",
-			expConfig: FetcherConfig{
+			expConfig: CollectorConfig{
 				APIKey:                      "bla",
 				Endpoint:                    DefaultEndpoint,
 				FetchEvents:                 true,
@@ -69,15 +69,15 @@ func Test_loadConfig(t *testing.T) {
 						Namespace: "default",
 					},
 					Data: map[string]string{
-						"endpoint":                      "http://localhost:5000/\n",
-						"fetcher.watchNamespace":        "namespace",
-						"fetcher.ignoreNamespaces":      "one\ntwo\n\n",
-						"fetcher.resources.secrets":     "\ntrue   \n",
-						"fetcher.resources.deployments": "false\n",
+						"endpoint":                        "http://localhost:5000/\n",
+						"collector.watchNamespace":        "namespace",
+						"collector.ignoreNamespaces":      "one\ntwo\n\n",
+						"collector.resources.secrets":     "\ntrue   \n",
+						"collector.resources.deployments": "false\n",
 					},
 				},
 			},
-			expConfig: FetcherConfig{
+			expConfig: CollectorConfig{
 				APIKey:                      "bla",
 				Endpoint:                    "http://localhost:5000/",
 				Namespace:                   "namespace",
@@ -110,8 +110,8 @@ func Test_loadConfig(t *testing.T) {
 			// Create a fake Kubernetes client
 			client := fake.NewSimpleClientset(test.objs...)
 
-			// create a fetcher instance
-			f := NewFetcher(&logger, client)
+			// create a collector instance
+			f := NewCollector(&logger, client)
 
 			if test.apiKey != "" {
 				os.Setenv(APIKeyEnvVar, test.apiKey)

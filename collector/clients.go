@@ -1,4 +1,4 @@
-package fetcher
+package collector
 
 import (
 	"context"
@@ -6,7 +6,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-func (f *Fetcher) getNamespaces(ctx context.Context) (
+func (f *Collector) getNamespaces(ctx context.Context) (
 	items []interface{},
 	err error,
 ) {
@@ -26,7 +26,7 @@ func (f *Fetcher) getNamespaces(ctx context.Context) (
 	return items, nil
 }
 
-func (f *Fetcher) getPods(ctx context.Context) (
+func (f *Collector) getPods(ctx context.Context) (
 	items []interface{},
 	err error,
 ) {
@@ -46,7 +46,7 @@ func (f *Fetcher) getPods(ctx context.Context) (
 	return items, nil
 }
 
-func (f *Fetcher) getEvents(ctx context.Context) (
+func (f *Collector) getEvents(ctx context.Context) (
 	items []interface{},
 	err error,
 ) {
@@ -66,7 +66,7 @@ func (f *Fetcher) getEvents(ctx context.Context) (
 	return items, nil
 }
 
-func (f *Fetcher) getConfigMaps(ctx context.Context) (
+func (f *Collector) getConfigMaps(ctx context.Context) (
 	items []interface{},
 	err error,
 ) {
@@ -86,7 +86,7 @@ func (f *Fetcher) getConfigMaps(ctx context.Context) (
 	return items, nil
 }
 
-func (f *Fetcher) getReplicationControllers(ctx context.Context) (
+func (f *Collector) getReplicationControllers(ctx context.Context) (
 	items []interface{},
 	err error,
 ) {
@@ -106,7 +106,7 @@ func (f *Fetcher) getReplicationControllers(ctx context.Context) (
 	return items, nil
 }
 
-func (f *Fetcher) getNodes(ctx context.Context) (
+func (f *Collector) getNodes(ctx context.Context) (
 	items []interface{},
 	err error,
 ) {
@@ -126,7 +126,7 @@ func (f *Fetcher) getNodes(ctx context.Context) (
 	return items, nil
 }
 
-func (f *Fetcher) getServices(ctx context.Context) (
+func (f *Collector) getServices(ctx context.Context) (
 	items []interface{},
 	err error,
 ) {
@@ -146,7 +146,7 @@ func (f *Fetcher) getServices(ctx context.Context) (
 	return items, nil
 }
 
-func (f *Fetcher) getServiceAccounts(ctx context.Context) (
+func (f *Collector) getServiceAccounts(ctx context.Context) (
 	items []interface{},
 	err error,
 ) {
@@ -166,7 +166,7 @@ func (f *Fetcher) getServiceAccounts(ctx context.Context) (
 	return items, nil
 }
 
-func (f *Fetcher) getPersistentVolumes(ctx context.Context) (
+func (f *Collector) getPersistentVolumes(ctx context.Context) (
 	items []interface{},
 	err error,
 ) {
@@ -186,7 +186,7 @@ func (f *Fetcher) getPersistentVolumes(ctx context.Context) (
 	return items, nil
 }
 
-func (f *Fetcher) getPersistentVolumeClaims(ctx context.Context) (
+func (f *Collector) getPersistentVolumeClaims(ctx context.Context) (
 	items []interface{},
 	err error,
 ) {
@@ -206,7 +206,7 @@ func (f *Fetcher) getPersistentVolumeClaims(ctx context.Context) (
 	return items, nil
 }
 
-func (f *Fetcher) getSecrets(ctx context.Context) (
+func (f *Collector) getSecrets(ctx context.Context) (
 	items []interface{},
 	err error,
 ) {
@@ -226,7 +226,7 @@ func (f *Fetcher) getSecrets(ctx context.Context) (
 	return items, nil
 }
 
-func (f *Fetcher) getDeployments(ctx context.Context) (
+func (f *Collector) getDeployments(ctx context.Context) (
 	items []interface{},
 	err error,
 ) {
@@ -246,7 +246,7 @@ func (f *Fetcher) getDeployments(ctx context.Context) (
 	return items, nil
 }
 
-func (f *Fetcher) getDaemonSets(ctx context.Context) (
+func (f *Collector) getDaemonSets(ctx context.Context) (
 	items []interface{},
 	err error,
 ) {
@@ -266,7 +266,7 @@ func (f *Fetcher) getDaemonSets(ctx context.Context) (
 	return items, nil
 }
 
-func (f *Fetcher) getReplicaSets(ctx context.Context) (
+func (f *Collector) getReplicaSets(ctx context.Context) (
 	items []interface{},
 	err error,
 ) {
@@ -286,7 +286,7 @@ func (f *Fetcher) getReplicaSets(ctx context.Context) (
 	return items, nil
 }
 
-func (f *Fetcher) getStatefulSet(ctx context.Context) (
+func (f *Collector) getStatefulSet(ctx context.Context) (
 	items []interface{},
 	err error,
 ) {
@@ -306,7 +306,7 @@ func (f *Fetcher) getStatefulSet(ctx context.Context) (
 	return items, nil
 }
 
-func (f *Fetcher) getJobs(ctx context.Context) (
+func (f *Collector) getJobs(ctx context.Context) (
 	items []interface{},
 	err error,
 ) {
@@ -326,7 +326,7 @@ func (f *Fetcher) getJobs(ctx context.Context) (
 	return items, nil
 }
 
-func (f *Fetcher) getCronJobs(ctx context.Context) (
+func (f *Collector) getCronJobs(ctx context.Context) (
 	items []interface{},
 	err error,
 ) {
@@ -346,7 +346,7 @@ func (f *Fetcher) getCronJobs(ctx context.Context) (
 	return items, nil
 }
 
-func (f *Fetcher) getIngresses(ctx context.Context) (
+func (f *Collector) getIngresses(ctx context.Context) (
 	items []interface{},
 	err error,
 ) {
@@ -366,7 +366,7 @@ func (f *Fetcher) getIngresses(ctx context.Context) (
 	return items, nil
 }
 
-func (f *Fetcher) getClusterRoles(ctx context.Context) (
+func (f *Collector) getClusterRoles(ctx context.Context) (
 	items []interface{},
 	err error,
 ) {

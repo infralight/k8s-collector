@@ -12,7 +12,7 @@ import (
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
 
-	"github.com/infralight/k8s-fetcher/fetcher"
+	"github.com/infralight/k8s-collector/collector"
 )
 
 func main() {
@@ -55,9 +55,7 @@ func main() {
 			Msg("Failed getting K8s client set")
 	}
 
-	f := fetcher.NewFetcher(&log.Logger, api)
-
-	err = f.Run(context.TODO())
+	err = collector.NewCollector(&log.Logger, api).Run(context.TODO())
 	if err != nil {
 		log.Fatal().
 			Err(err).

@@ -1,11 +1,11 @@
 apiVersion: v1
 kind: ConfigMap
 metadata:
-  name: infralight-k8s-fetcher-config
+  name: infralight-k8s-collector-config
 data:
   endpoint: https://api.infralight.co/k8s
-  fetcher.watchNamespace: default
-  fetcher.ignoreNamespaces: |
+  collector.watchNamespace: default
+  collector.ignoreNamespaces: |
     kube-system
-  fetcher.resources.secrets: "true"
-  fetcher.resources.configMaps: "false"
+  collector.resources.secrets: "true"
+  collector.resources.configMaps: "false"

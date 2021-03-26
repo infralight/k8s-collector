@@ -1,4 +1,4 @@
-package fetcher
+package collector
 
 import (
 	"context"
@@ -12,20 +12,20 @@ import (
 	"k8s.io/client-go/kubernetes"
 )
 
-type Fetcher struct {
+type Collector struct {
 	log           *zerolog.Logger
 	api           kubernetes.Interface
 	namespace     string
 	configMapName string
-	config        *FetcherConfig
+	config        *CollectorConfig
 }
 
-type FetcherData struct {
+type CollectorData struct {
 	Objects []interface{} `json:"objects"`
 }
 
-func NewFetcher(log *zerolog.Logger, api kubernetes.Interface) *Fetcher {
-	return &Fetcher{
+func NewCollector(log *zerolog.Logger, api kubernetes.Interface) *Collector {
+	return &Collector{
 		log:           log,
 		api:           api,
 		namespace:     DefaultNamespace,
@@ -33,12 +33,12 @@ func NewFetcher(log *zerolog.Logger, api kubernetes.Interface) *Fetcher {
 	}
 }
 
-func (f *Fetcher) SetNamespace(ns string) *Fetcher {
+func (f *Collector) SetNamespace(ns string) *Collector {
 	f.namespace = ns
 	return f
 }
 
-func (f *Fetcher) SetConfigMapName(name string) *Fetcher {
+func (f *Collector) SetConfigMapName(name string) *Collector {
 	f.configMapName = name
 	return f
 }
@@ -49,7 +49,7 @@ type fetchFunc struct {
 	onlyIf bool
 }
 
-func (f *Fetcher) Run(ctx context.Context) error {
+func (f *Collector) Run(ctx context.Context) error {
 	// load our configuration from a ConfigMap
 	err := f.loadConfig(ctx)
 	if err != nil {
@@ -88,7 +88,7 @@ func (f *Fetcher) Run(ctx context.Context) error {
 			f.log.Warn().
 				Err(err).
 				Str("kind", fn.kind).
-				Msg("Fetcher function failed")
+				Msg("Collector function failed")
 			continue
 		}
 
@@ -109,7 +109,7 @@ func (f *Fetcher) Run(ctx context.Context) error {
 	}
 
 	// encode data to JSON
-	rawBody, err := json.Marshal(FetcherData{objects})
+	rawBody, err := json.Marshal(CollectorData{objects})
 	if err != nil {
 		return fmt.Errorf("failed encoding to JSON: %w", err)
 	}
