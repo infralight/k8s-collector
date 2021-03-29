@@ -47,13 +47,14 @@ The collector must be configured with an Infralight-provided API key in order to
 be able to send data to Infralight. This key should be provided as an environment
 variable called `INFRALIGHT_API_KEY`, and it is recommended that this key is
 stored as a Kubernetes [Secret](https://kubernetes.io/docs/concepts/configuration/secret/) and automatically injected into the collector's pod.
-A sample secret template is included in the [secret.sample.yaml](secret.sample.yaml) file.
+A [sample secret template](data/secret.sample.yaml) is included in the repository.
 
 The collector's behavior may also be configured and modified via an optional
 Kubernetes [ConfigMap](https://kubernetes.io/docs/concepts/configuration/configmap/). This allows changing the HTTP endpoint to which data
 is sent, enable/disable the collection of object types, and more. Currently,
 this ConfigMap must be named "infralight-k8s-collector-config" to be accepted by
-the collector. A sample template is included in the [configmap.sample.yaml](configmap.sample.yaml) file.
+the collector. A [sample ConfigMap template](data/configmap.sample.yaml) is
+included in the repository.
 
 If a ConfigMap does not exist, default configuration options will be used. By
 default, secrets will _not_ be collected, but all other supported object types
@@ -103,7 +104,14 @@ In production, the collector should be configured as a Kubernetes [CronJob](http
 and provided access to collect information from the cluster via a
 [service account](https://kubernetes.io/docs/tasks/configure-pod-container/configure-service-account/).
 
-A sample [cronjob.sample.yaml](cronjob.sample.yaml) file is included in the repository.
+A [sample CronJob template](data/cronjob.sample.yaml) is included in the repository.
+Permissions must be provided to the service account via a Cluster Role and a
+Cluster Role Binding. Sample files for both ([Cluster Role](data/clusterrole.sample.yaml),
+[Cluster Role Binding](data/clusterrolebinding.sample.yaml)) are included in the repository.
+These can be provided as-is to customers, but they may wish to modify them,
+depending on the configuration and the type of Kubernetes resources they wish
+to provide Infralight access to. For example, permission to view secrets is
+disabled by default and thus is commented out in the sample file.
 
 ### Requirements
 
@@ -112,20 +120,26 @@ A sample [cronjob.sample.yaml](cronjob.sample.yaml) file is included in the repo
 
 ### Quick Start
 
-1. Grant the default service account access to view the cluster:
-```sh
-kubectl create clusterrolebinding default-view --clusterrole=view --serviceaccount=default:default
-```
-
-2. Create the K8s CronJob for the collector:
-```sh
-kubectl create -f cronjob.sample.yaml
-```
-
-3. Inspect the job using the command line:
-```sh
-kubectl get jobs --watch
-```
+1. Create the Cluster Role.
+    ```sh
+    kubectl create -f data/clusterrole.sample.yaml
+    ```
+2. Bind the default service account to the Cluster Role:
+    ```sh
+    kubectl create -f data/clusterrolebinding.sample.yaml
+    ```
+3. Grant the default service account access to the role binding:
+    ```sh
+    kubectl create clusterrolebinding default-view --clusterrole=infralight-view --serviceaccount=default:default
+    ```
+4. Create the K8s CronJob for the collector:
+    ```sh
+    kubectl create -f cronjob.sample.yaml
+    ```
+5. Inspect the job using the command line:
+    ```sh
+    kubectl get jobs --watch
+    ```
 
 The sample file triggers the job at 15 minute intervals.
 
@@ -160,24 +174,33 @@ $ golangci-lint run ./...
 ```
 
 ### Quick Start
+
 1. Make sure the Docker daemon is running.
 2. Start minikube on top of Docker:
     ```sh
     minikube start --driver=docker
     ```
-3. Grant the default service account access to view the cluster:
+3. Create the Cluster Role.
     ```sh
-    minikube kubectl create clusterrolebinding default-view --clusterrole=view --serviceaccount=default:default
+    kubectl create -f data/clusterrole.sample.yaml
     ```
-4. Create the ConfigMap for the collector, if needed:
+4. Bind the default service account to the Cluster Role:
     ```sh
-    minikube kubectl create -f configmap.sample.yaml
+    kubectl create -f data/clusterrolebinding.sample.yaml
     ```
-5. To run the collector out-of-cluster, execute:
+5. Grant the default service account access to the role binding:
+    ```sh
+    kubectl create clusterrolebinding default-view --clusterrole=infralight-view --serviceaccount=default:default
+    ```
+6. Create the ConfigMap for the collector, if needed:
+    ```sh
+    kubectl create -f data/configmap.sample.yaml
+    ```
+7. To run the collector out-of-cluster, execute:
     ```sh
     INFRALIGHT_API_KEY=key go run main.go -external ~/.kube/config -debug
     ```
-6. To run the collector in-cluster, more steps are required:
+8. To run the collector in-cluster, more steps are required:
     1. Load environment variables so the Docker client works against the local `minikube` Docker daemon:
         ```sh
         eval $(minikube docker-env)
@@ -188,11 +211,11 @@ $ golangci-lint run ./...
         ```
     3. Create the secret containing the API key:
         ```sh
-        minikube kubectl create -f secret.sampl.yaml
+        kubectl create -f data/secret.sample.yaml
         ```
     4. Create the K8s CronJob for the collector:
         ```sh
-        minikube kubectl create -f cronjob.sample.yaml
+        kubectl create -f data/cronjob.sample.yaml
         ```
     5. Inspect the job using the command line or the minikube Dashboard:
         ```sh
@@ -200,6 +223,6 @@ $ golangci-lint run ./...
         ```
     6. Cleanup:
         ```sh
-        minikube kubectl delete cronjob infralight-k8s-collector
+        kubectl delete cronjob infralight-k8s-collector
         eval $(minikube docker-env -u)
         ```

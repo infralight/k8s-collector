@@ -1,0 +1,67 @@
+kind: ClusterRole
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: infralight-view
+rules:
+  - verbs:
+      - get
+    apiGroups:
+      - ''
+    resources:
+      - configmaps
+  - verbs:
+      - list
+    apiGroups:
+      - ''
+    resources:
+      - configmaps
+      - persistentvolumes
+      - persistentvolumeclaims
+      - pods
+      - replicationcontrollers
+      - serviceaccounts
+      - services
+      - services/status
+      - events
+      - nodes
+      - namespaces
+      #- secrets
+  - verbs:
+      - list
+    apiGroups:
+      - apps
+    resources:
+      - daemonsets
+      - deployments
+      - replicasets
+      - statefulsets
+  - verbs:
+      - list
+    apiGroups:
+      - batch
+    resources:
+      - cronjobs
+      - jobs
+  - verbs:
+      - list
+    apiGroups:
+      - extensions
+    resources:
+      - daemonsets
+      - deployments
+      - ingresses
+      - networkpolicies
+      - replicasets
+  - verbs:
+      - list
+    apiGroups:
+      - networking.k8s.io
+    resources:
+      - ingresses
+      - networkpolicies
+  - verbs:
+      - list
+    apiGroups:
+      - rbac.authorization.k8s.io
+    resources:
+      - clusterroles
