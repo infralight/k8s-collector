@@ -13,9 +13,14 @@ spec:
               image: infralight/k8s-collector:1.0.0
               imagePullPolicy: IfNotPresent
               env:
-                - name: INFRALIGHT_API_KEY
+                - name: INFRALIGHT_ACCESS_KEY
                   valueFrom:
                     secretKeyRef:
                       name: infralight
-                      key: apiKey
+                      key: accessKey
+                - name: INFRALIGHT_SECRET_KEY
+                  valueFrom:
+                    secretKeyRef:
+                      name: infralight
+                      key: secretKey
           restartPolicy: OnFailure

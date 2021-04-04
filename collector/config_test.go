@@ -20,20 +20,23 @@ func Test_loadConfig(t *testing.T) {
 
 	var tests = []struct {
 		name      string
-		apiKey    string
+		accessKey string
+		secretKey string
 		objs      []runtime.Object
 		expErr    error
 		expConfig CollectorConfig
 	}{
 		{
 			name:   "no secret, no config",
-			expErr: ErrAPIKey,
+			expErr: ErrAccessKeys,
 		},
 		{
-			name:   "secret, no config",
-			apiKey: "bla",
+			name:      "secret, no config",
+			accessKey: "bla",
+			secretKey: "bla2",
 			expConfig: CollectorConfig{
-				APIKey:                      "bla",
+				AccessKey:                   "bla",
+				SecretKey:                   "bla2",
 				Endpoint:                    DefaultEndpoint,
 				FetchEvents:                 true,
 				FetchConfigMaps:             true,
@@ -57,8 +60,9 @@ func Test_loadConfig(t *testing.T) {
 			},
 		},
 		{
-			name:   "secret, config",
-			apiKey: "bla",
+			name:      "secret, config",
+			accessKey: "bla",
+			secretKey: "bla2",
 			objs: []runtime.Object{
 				&v1.ConfigMap{
 					TypeMeta: metav1.TypeMeta{
@@ -78,8 +82,9 @@ func Test_loadConfig(t *testing.T) {
 				},
 			},
 			expConfig: CollectorConfig{
-				APIKey:                      "bla",
-				Endpoint:                    "http://localhost:5000/",
+				AccessKey:                   "bla",
+				SecretKey:                   "bla2",
+				Endpoint:                    "http://localhost:5000",
 				Namespace:                   "namespace",
 				IgnoreNamespaces:            []string{"one", "two"},
 				FetchEvents:                 true,
@@ -113,10 +118,12 @@ func Test_loadConfig(t *testing.T) {
 			// create a collector instance
 			f := NewCollector(&logger, client)
 
-			if test.apiKey != "" {
-				os.Setenv(APIKeyEnvVar, test.apiKey)
+			if test.accessKey != "" {
+				os.Setenv(AccessKeyEnvVar, test.accessKey)
+				os.Setenv(SecretKeyEnvVar, test.secretKey)
 			} else {
-				os.Unsetenv(APIKeyEnvVar)
+				os.Unsetenv(AccessKeyEnvVar)
+				os.Unsetenv(SecretKeyEnvVar)
 			}
 
 			err := f.loadConfig(context.Background())

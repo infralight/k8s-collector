@@ -1,10 +1,10 @@
 package collector
 
 import (
+	"compress/gzip"
 	"context"
 	"encoding/json"
 	"fmt"
-	"io"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -12,7 +12,6 @@ import (
 	"sort"
 	"testing"
 
-	"github.com/DataDog/zstd"
 	"github.com/jgroeneveld/trial/assert"
 	"github.com/rs/zerolog"
 	v1 "k8s.io/api/core/v1"
@@ -26,23 +25,13 @@ func TestRun(t *testing.T) {
 	logger := zerolog.Nop()
 
 	var tests = []struct {
-		name        string
-		validAPIKey string
-		testAPIKey  string
-		objs        []runtime.Object
-		expObjects  []string
-		expErr      bool
+		name       string
+		objs       []runtime.Object
+		expObjects []string
+		expErr     bool
 	}{
 		{
-			name:        "invalid API key",
-			validAPIKey: "key",
-			testAPIKey:  "kei",
-			expErr:      true,
-		},
-		{
-			name:        "simple test",
-			validAPIKey: "key",
-			testAPIKey:  "key",
+			name: "simple test",
 			objs: []runtime.Object{
 				&v1.Pod{
 					TypeMeta: metav1.TypeMeta{Kind: "Pod"},
@@ -72,25 +61,17 @@ func TestRun(t *testing.T) {
 			// we generate, and only return 204 No Content if the data matches
 			// the test's expectations
 			ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-				if r.Header.Get("Authorization") != fmt.Sprintf("Bearer %s", test.validAPIKey) {
-					w.WriteHeader(http.StatusUnauthorized)
-					return
-				}
-
 				// read the data we've received and decode it into an array
 				// of Kubernetes objects
-				body, err := io.ReadAll(r.Body)
-				if err != nil {
-					w.WriteHeader(http.StatusInternalServerError)
-					return
-				}
-
-				if r.Header.Get("Content-Encoding") == "zstd" {
-					body, err = zstd.Decompress(nil, body)
+				reader := r.Body
+				if r.Header.Get("Content-Encoding") == "gzip" {
+					var err error
+					reader, err = gzip.NewReader(r.Body)
 					if err != nil {
 						w.WriteHeader(http.StatusInternalServerError)
 						return
 					}
+					defer reader.Close()
 				}
 
 				var data struct {
@@ -102,7 +83,7 @@ func TestRun(t *testing.T) {
 						} `json:"metadata"`
 					}
 				}
-				err = json.Unmarshal(body, &data)
+				err := json.NewDecoder(reader).Decode(&data)
 				if err != nil {
 					w.WriteHeader(http.StatusBadRequest)
 					return
@@ -147,11 +128,21 @@ func TestRun(t *testing.T) {
 			client := fake.NewSimpleClientset(test.objs...)
 
 			// create a collector instance
-			os.Setenv(APIKeyEnvVar, test.testAPIKey)
 			f := NewCollector(&logger, client)
 
+			ctx := context.Background()
+
+			os.Setenv(AccessKeyEnvVar, "bla")
+			os.Setenv(SecretKeyEnvVar, "bla")
+			err := f.loadConfig(ctx)
+			if err != nil {
+				t.Fatalf("Failed configuring collector: %s", err)
+			}
+
 			// run the collector
-			err := f.Run(context.Background())
+			objects := f.collect(ctx)
+
+			err = f.send(objects)
 			if test.expErr {
 				assert.MustNotBeNil(t, err, "error must not be nil")
 			} else {

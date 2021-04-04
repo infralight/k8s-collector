@@ -2,11 +2,9 @@ package collector
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"net/http"
 
-	"github.com/DataDog/zstd"
 	"github.com/ido50/requests"
 	"github.com/rs/zerolog"
 	"k8s.io/client-go/kubernetes"
@@ -18,6 +16,7 @@ type Collector struct {
 	namespace     string
 	configMapName string
 	config        *CollectorConfig
+	accessToken   string
 }
 
 type CollectorData struct {
@@ -56,8 +55,41 @@ func (f *Collector) Run(ctx context.Context) error {
 		return fmt.Errorf("failed loading configuration map: %w", err)
 	}
 
-	var objects []interface{} // nolint: prealloc
+	// authenticate with the Infralight API
+	f.accessToken, err = f.authenticate()
+	if err != nil {
+		return fmt.Errorf("failed authenticating with Infralight API: %w", err)
+	}
 
+	objects := f.collect(ctx)
+
+	err = f.send(objects)
+	if err != nil {
+		return fmt.Errorf("failed sending objects to Infralight: %w", err)
+	}
+
+	return nil
+}
+
+func (f *Collector) authenticate() (accessToken string, err error) {
+	var credentials struct {
+		Token     string `json:"access_token"`
+		ExpiresIn int64  `json:"expires_in"`
+		Type      string `json:"token_type"`
+	}
+
+	err = requests.NewClient(f.config.Endpoint).
+		NewRequest("POST", "/sink/login").
+		JSONBody(map[string]interface{}{
+			"accessKey": f.config.AccessKey,
+			"secretKey": f.config.SecretKey,
+		}).
+		Into(&credentials).
+		Run()
+	return credentials.Token, err
+}
+
+func (f *Collector) collect(ctx context.Context) (objects []interface{}) {
 	for _, fn := range []fetchFunc{
 		{"ClusterRole", f.getClusterRoles, f.config.FetchClusterRoles},
 		{"ConfigMap", f.getConfigMaps, f.config.FetchConfigMaps},
@@ -99,45 +131,15 @@ func (f *Collector) Run(ctx context.Context) error {
 		objects = append(objects, items...)
 	}
 
-	// start building an HTTP request to send the data to the Infralight API
-	req := requests.NewClient(f.config.Endpoint).
-		Header("Authorization", fmt.Sprintf("Bearer %s", f.config.APIKey)).
-		NewRequest("POST", "").
-		ExpectedStatus(http.StatusNoContent)
-	if err != nil {
-		return fmt.Errorf("failed sending data to %s: %w", f.config.Endpoint, err)
-	}
+	return objects
+}
 
-	// encode data to JSON
-	rawBody, err := json.Marshal(CollectorData{objects})
-	if err != nil {
-		return fmt.Errorf("failed encoding to JSON: %w", err)
-	}
-
-	f.log.Debug().
-		Bytes("body", rawBody).
-		Msg("Sending data to Infralight")
-
-	// compress data with zstd. if this fails, we'll still send, but uncompressed
-	compressedBody, err := zstd.CompressLevel(nil, rawBody, 10)
-	if err != nil {
-		f.log.Warn().
-			Err(err).
-			Msg("Failed compressing data, will send uncompressed")
-
-		req.Body(rawBody, "application/json")
-	} else {
-		req.
-			Header("Content-Encoding", "zstd").
-			Body(compressedBody, "application/json")
-	}
-
-	// send the request, we will fail unless the server returned the expected
-	// status (204 no content)
-	err = req.Run()
-	if err != nil {
-		return fmt.Errorf("failed sending data to Infralight: %w", err)
-	}
-
-	return nil
+func (f *Collector) send(objects []interface{}) error {
+	return requests.NewClient(f.config.Endpoint).
+		Header("Authorization", fmt.Sprintf("Bearer %s", f.accessToken)).
+		NewRequest("POST", "/sink/send").
+		CompressWith(requests.CompressionAlgorithmGzip).
+		ExpectedStatus(http.StatusNoContent).
+		JSONBody(CollectorData{objects}).
+		Run()
 }

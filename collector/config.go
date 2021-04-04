@@ -14,18 +14,20 @@ import (
 )
 
 const (
-	APIKeyEnvVar         = "INFRALIGHT_API_KEY"
-	DefaultEndpoint      = "https://api.infralight.co/k8s"
+	AccessKeyEnvVar      = "INFRALIGHT_ACCESS_KEY"
+	SecretKeyEnvVar      = "INFRALIGHT_SECRET_KEY" // nolint: gosec
+	DefaultEndpoint      = "https://prodapi.infralight.cloud/sink"
 	DefaultNamespace     = "default"
 	DefaultConfigMapName = "infralight-k8s-collector-config"
 )
 
 var (
-	ErrAPIKey = errors.New("API key must be provided")
+	ErrAccessKeys = errors.New("access and secret keys must be provided")
 )
 
 type CollectorConfig struct {
-	APIKey                      string
+	AccessKey                   string
+	SecretKey                   string
 	Endpoint                    string
 	Namespace                   string
 	IgnoreNamespaces            []string
@@ -52,9 +54,10 @@ type CollectorConfig struct {
 
 func (f *Collector) loadConfig(ctx context.Context) error {
 	// load Infralight API Key from the environment, this is required
-	apiKey := os.Getenv(APIKeyEnvVar)
-	if apiKey == "" {
-		return ErrAPIKey
+	accessKey := os.Getenv(AccessKeyEnvVar)
+	secretKey := os.Getenv(SecretKeyEnvVar)
+	if accessKey == "" || secretKey == "" {
+		return ErrAccessKeys
 	}
 
 	// now load our optional ConfigMap from Kubernetes
@@ -79,8 +82,9 @@ func (f *Collector) loadConfig(ctx context.Context) error {
 	}
 
 	f.config = &CollectorConfig{
-		APIKey:                      apiKey,
-		Endpoint:                    parseOne(config.Data["endpoint"], DefaultEndpoint),
+		AccessKey:                   accessKey,
+		SecretKey:                   secretKey,
+		Endpoint:                    strings.TrimSuffix(parseOne(config.Data["endpoint"], DefaultEndpoint), "/"),
 		Namespace:                   parseOne(config.Data["collector.watchNamespace"], ""),
 		IgnoreNamespaces:            parseMultiple(config.Data["collector.ignoreNamespaces"], nil),
 		FetchEvents:                 parseBool(config.Data["collector.resources.events"], true),

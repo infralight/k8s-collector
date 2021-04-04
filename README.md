@@ -43,10 +43,11 @@ to fetch objects of other types.
 
 ## Configuration
 
-The collector must be configured with an Infralight-provided API key in order to
-be able to send data to Infralight. This key should be provided as an environment
-variable called `INFRALIGHT_API_KEY`, and it is recommended that this key is
-stored as a Kubernetes [Secret](https://kubernetes.io/docs/concepts/configuration/secret/) and automatically injected into the collector's pod.
+The collector must be configured with an Infralight-provided access and secret
+keys in order to be able to send data to Infralight. These keys musy be provided
+as environment variables called `INFRALIGHT_ACCESS_KEY` and `INFRALIGHT_SECRET_KEY`,
+respectively. It is recommended that these keys are stored as a Kubernetes
+[Secret](https://kubernetes.io/docs/concepts/configuration/secret/) and automatically injected into the collector's pod.
 A [sample secret template](data/secret.sample.yaml) is included in the repository.
 
 The collector's behavior may also be configured and modified via an optional
@@ -74,11 +75,11 @@ The image is named `infralight/k8s-collector`.
 ## Server-Side Notes
 
 The collector sends the collected objects to the Infralight endpoint serialized
-via JSON. Requests will be compressed using the [zstd](https://facebook.github.io/zstd/) algorithm, unless
+via JSON. Requests will be compressed using the gzip algorithm, unless
 compression fails, in which case no compression will be used. The server MUST
 inspect the contents of the `Content-Encoding` request header to check whether
 the request body is compressed or not, and only attempt to decompress using
-`zstd` if the header's value is `"zstd"`.
+`gzip` if the header's value is `"gzip"`.
 
 The JSON format of each request is as follows:
 
@@ -198,7 +199,8 @@ $ golangci-lint run ./...
     ```
 7. To run the collector out-of-cluster, execute:
     ```sh
-    INFRALIGHT_API_KEY=key go run main.go -external ~/.kube/config -debug
+    INFRALIGHT_ACCESS_KEY=<accessKey> INFRALIGHT_SECRET_KEY=<secretKey> \
+        go run main.go -external ~/.kube/config -debug
     ```
 8. To run the collector in-cluster, more steps are required:
     1. Load environment variables so the Docker client works against the local `minikube` Docker daemon:

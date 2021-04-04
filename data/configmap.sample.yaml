@@ -3,7 +3,7 @@ kind: ConfigMap
 metadata:
   name: infralight-k8s-collector-config
 data:
-  endpoint: https://api.infralight.co/k8s
+  endpoint: http://localhost:7777/api
   collector.watchNamespace: default
   collector.ignoreNamespaces: |
     kube-system
