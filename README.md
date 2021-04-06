@@ -43,7 +43,14 @@ to fetch objects of other types.
 
 ## Configuration
 
-The collector must be configured with an Infralight-provided access and secret
+Since Kubernetes does not provide a way to access a unique name or ID for a
+cluster, a cluster identifier must be provided to the collector. It can either
+be provided via a command line argument, or via the `CLUSTER_ID` environment
+variable. The command line argument has precedence over the env var. The cluster
+ID must only contain lowercase alphanumeric characters, dashes and underscore
+(spaces are not allowed).
+
+The collector must also be configured with an Infralight-provided access and secret
 keys in order to be able to send data to Infralight. These keys musy be provided
 as environment variables called `INFRALIGHT_ACCESS_KEY` and `INFRALIGHT_SECRET_KEY`,
 respectively. It is recommended that these keys are stored as a Kubernetes
@@ -92,9 +99,9 @@ The JSON format of each request is as follows:
 }
 ```
 
-The format of object types themselves is generally consistent, and is documented
-[here](https://pkg.go.dev/k8s.io/api/core/v1). See [this](https://pkg.go.dev/k8s.io/api/core/v1#Pod) for an example of the structure of an object of type
-Pod.
+The format of object types themselves is generally consistent, and is
+documented [here](https://github.com/kubernetes/community/blob/master/contributors/devel/sig-architecture/api-conventions.md#types-kinds).
+See [this](https://pkg.go.dev/k8s.io/api/core/v1#Pod) for an example of the structure of an object of type Pod.
 
 When a request is handled by the Infralight endpoint, it is expected to return
 a [204 No Content](https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/204) response with no body, unless an error has occurred.
@@ -200,7 +207,7 @@ $ golangci-lint run ./...
 7. To run the collector out-of-cluster, execute:
     ```sh
     INFRALIGHT_ACCESS_KEY=<accessKey> INFRALIGHT_SECRET_KEY=<secretKey> \
-        go run main.go -external ~/.kube/config -debug
+        go run main.go -external ~/.kube/config -debug <clusterId>
     ```
 8. To run the collector in-cluster, more steps are required:
     1. Load environment variables so the Docker client works against the local `minikube` Docker daemon:

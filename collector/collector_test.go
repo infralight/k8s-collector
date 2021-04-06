@@ -76,11 +76,13 @@ func TestRun(t *testing.T) {
 
 				var data struct {
 					Objects []struct {
-						Kind     string `json:"kind"`
-						Metadata struct {
-							Name      string `json:"name"`
-							Namespace string `json:"namespace"`
-						} `json:"metadata"`
+						Kind   string `json:"kind"`
+						Object struct {
+							Metadata struct {
+								Name      string `json:"name"`
+								Namespace string `json:"namespace"`
+							} `json:"metadata"`
+						} `json:"object"`
 					}
 				}
 				err := json.NewDecoder(reader).Decode(&data)
@@ -92,7 +94,7 @@ func TestRun(t *testing.T) {
 				// convert the objects to a list of strings
 				objs := make([]string, len(data.Objects))
 				for i, obj := range data.Objects {
-					objs[i] = fmt.Sprintf("%s:%s:%s", obj.Kind, obj.Metadata.Namespace, obj.Metadata.Name)
+					objs[i] = fmt.Sprintf("%s:%s:%s", obj.Kind, obj.Object.Metadata.Namespace, obj.Object.Metadata.Name)
 				}
 
 				sort.Strings(objs)
@@ -128,7 +130,7 @@ func TestRun(t *testing.T) {
 			client := fake.NewSimpleClientset(test.objs...)
 
 			// create a collector instance
-			f := NewCollector(&logger, client)
+			f := NewCollector("test", &logger, client)
 
 			ctx := context.Background()
 

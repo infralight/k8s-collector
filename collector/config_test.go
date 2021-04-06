@@ -116,7 +116,7 @@ func Test_loadConfig(t *testing.T) {
 			client := fake.NewSimpleClientset(test.objs...)
 
 			// create a collector instance
-			f := NewCollector(&logger, client)
+			f := NewCollector("test", &logger, client)
 
 			if test.accessKey != "" {
 				os.Setenv(AccessKeyEnvVar, test.accessKey)

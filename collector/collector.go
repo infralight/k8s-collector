@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"net/http"
+	"regexp"
 
 	"github.com/ido50/requests"
 	"github.com/rs/zerolog"
@@ -11,6 +12,7 @@ import (
 )
 
 type Collector struct {
+	clusterID     string
 	log           *zerolog.Logger
 	api           kubernetes.Interface
 	namespace     string
@@ -19,14 +21,35 @@ type Collector struct {
 	accessToken   string
 }
 
-type CollectorData struct {
-	Objects []interface{} `json:"objects"`
+// K8sObject is a pointless struct type that we have no choice but create due to
+// an issue with how the official Kubernetes client encodes objects to JSON.
+// The "Kind" attribute that each object has is in an embedded struct that is
+// set with the following struct tag: json:",inline". The problem is that the
+// "inline" struct tag is still in proposal status and not supported by Go,
+// (see here: https://github.com/golang/go/issues/6213), and so JSON objects are
+// missing the "kind" attribute. This is just a workaround to ensure we also
+// send the kind.
+type K8sObject struct {
+	Kind   string      `json:"kind"`
+	Object interface{} `json:"object"`
 }
 
-func NewCollector(log *zerolog.Logger, api kubernetes.Interface) *Collector {
+type CollectorData struct {
+	ClusterID string      `json:"cluster_id"`
+	Objects   []K8sObject `json:"objects"`
+}
+
+var clusterIDRegex = regexp.MustCompile(`^[a-z0-9-_]+$`)
+
+func NewCollector(
+	clusterID string,
+	log *zerolog.Logger,
+	api kubernetes.Interface,
+) *Collector {
 	return &Collector{
 		log:           log,
 		api:           api,
+		clusterID:     clusterID,
 		namespace:     DefaultNamespace,
 		configMapName: DefaultConfigMapName,
 	}
@@ -49,6 +72,11 @@ type fetchFunc struct {
 }
 
 func (f *Collector) Run(ctx context.Context) error {
+	// verify cluster ID is valid
+	if !clusterIDRegex.MatchString(f.clusterID) {
+		return fmt.Errorf("invalid cluster ID, must match %s", clusterIDRegex)
+	}
+
 	// load our configuration from a ConfigMap
 	err := f.loadConfig(ctx)
 	if err != nil {
@@ -79,7 +107,7 @@ func (f *Collector) authenticate() (accessToken string, err error) {
 	}
 
 	err = requests.NewClient(f.config.Endpoint).
-		NewRequest("POST", "/sink/login").
+		NewRequest("POST", "/account/access_keys/login").
 		JSONBody(map[string]interface{}{
 			"accessKey": f.config.AccessKey,
 			"secretKey": f.config.SecretKey,
@@ -89,7 +117,7 @@ func (f *Collector) authenticate() (accessToken string, err error) {
 	return credentials.Token, err
 }
 
-func (f *Collector) collect(ctx context.Context) (objects []interface{}) {
+func (f *Collector) collect(ctx context.Context) (objects []K8sObject) {
 	for _, fn := range []fetchFunc{
 		{"ClusterRole", f.getClusterRoles, f.config.FetchClusterRoles},
 		{"ConfigMap", f.getConfigMaps, f.config.FetchConfigMaps},
@@ -128,18 +156,26 @@ func (f *Collector) collect(ctx context.Context) (objects []interface{}) {
 			continue
 		}
 
-		objects = append(objects, items...)
+		for _, item := range items {
+			objects = append(objects, K8sObject{
+				Kind:   fn.kind,
+				Object: item,
+			})
+		}
 	}
 
 	return objects
 }
 
-func (f *Collector) send(objects []interface{}) error {
+func (f *Collector) send(objects []K8sObject) error {
 	return requests.NewClient(f.config.Endpoint).
 		Header("Authorization", fmt.Sprintf("Bearer %s", f.accessToken)).
-		NewRequest("POST", "/sink/send").
+		NewRequest("POST", "/k8scollector").
 		CompressWith(requests.CompressionAlgorithmGzip).
 		ExpectedStatus(http.StatusNoContent).
-		JSONBody(CollectorData{objects}).
+		JSONBody(CollectorData{
+			ClusterID: f.clusterID,
+			Objects:   objects,
+		}).
 		Run()
 }

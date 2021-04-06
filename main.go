@@ -21,6 +21,15 @@ func main() {
 	external := flag.String("external", "", "run outside of the cluster (provide path to kubeconfig file)")
 	flag.Parse()
 
+	clusterID := flag.Arg(0)
+	if clusterID == "" {
+		clusterID = os.Getenv("CLUSTER_ID")
+	}
+	if clusterID == "" {
+		log.Fatal().
+			Msg("Cluster ID must be provided either as a command line argument, or via the CLUSTER_ID environment variable")
+	}
+
 	// When running in debug mode, enable pretty-printed logging with minimum
 	// log level set at DEBUG. In non-debug mode, use standard JSON logging with
 	// unix timestamp for better performance
@@ -55,7 +64,7 @@ func main() {
 			Msg("Failed getting K8s client set")
 	}
 
-	err = collector.NewCollector(&log.Logger, api).Run(context.TODO())
+	err = collector.NewCollector(clusterID, &log.Logger, api).Run(context.TODO())
 	if err != nil {
 		log.Fatal().
 			Err(err).

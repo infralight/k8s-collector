@@ -16,7 +16,7 @@ import (
 const (
 	AccessKeyEnvVar      = "INFRALIGHT_ACCESS_KEY"
 	SecretKeyEnvVar      = "INFRALIGHT_SECRET_KEY" // nolint: gosec
-	DefaultEndpoint      = "https://prodapi.infralight.cloud/sink"
+	DefaultEndpoint      = "https://prodapi.infralight.cloud"
 	DefaultNamespace     = "default"
 	DefaultConfigMapName = "infralight-k8s-collector-config"
 )

@@ -23,4 +23,6 @@ spec:
                     secretKeyRef:
                       name: infralight
                       key: secretKey
+                - name: CLUSTER_ID
+                  value: "test"
           restartPolicy: OnFailure
