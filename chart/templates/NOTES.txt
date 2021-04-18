@@ -1,0 +1,4 @@
+Thank you for installing the Infralight Kubernetes Collector.
+The collector is implemented as a Kubernetes CronJob that is executed
+based on your chosen schedule (or every 15 minutes by default), and
+sends the information to the Infralight App Server.

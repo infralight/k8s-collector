@@ -1,0 +1,32 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ .Release.Name }}-config
+data:
+  endpoint: {{ .Values.apiEndpoint }}
+  collector.watchNamespace: default
+  collector.ignoreNamespaces: |
+    kube-system
+  collector.resources.events: "true"
+  collector.resources.replicationControllers: "true"
+  collector.resources.services: "true"
+  collector.resources.serviceAccounts: "true"
+  collector.resources.pods: "true"
+  collector.resources.nodes: "true"
+  collector.resources.persistentVolumes: "true"
+  collector.resources.persistentVolumeClaims: "true"
+  collector.resources.namespaces: "true"
+  collector.resources.configMaps: "true"
+  collector.resources.deployments: "true"
+  collector.resources.daemonSets: "true"
+  collector.resources.replicaSets: "true"
+  collector.resources.statefulSets: "true"
+  collector.resources.jobs: "true"
+  collector.resources.cronJobs: "true"
+  collector.resources.ingresses: "true"
+  collector.resources.clusterRoles: "true"
+{{- if .Values.collectSecrets}}
+  collector.resources.secrets: "true"
+{{- else }}
+  collector.resources.secrets: "false"
+{{- end }}

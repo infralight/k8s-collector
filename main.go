@@ -19,6 +19,7 @@ func main() {
 	// Enable a debug flag for more verbose logging
 	debug := flag.Bool("debug", false, "sets log level to debug")
 	external := flag.String("external", "", "run outside of the cluster (provide path to kubeconfig file)")
+	configDir := flag.String("config", "/etc/config", "configuration files directory")
 	flag.Parse()
 
 	clusterID := flag.Arg(0)
@@ -64,12 +65,15 @@ func main() {
 			Msg("Failed getting K8s client set")
 	}
 
-	err = collector.NewCollector(clusterID, &log.Logger, api).Run(context.TODO())
+	err = collector.
+		NewCollector(clusterID, &log.Logger, api).
+		SetConfigDir(*configDir).
+		Run(context.TODO())
 	if err != nil {
 		log.Fatal().
 			Err(err).
 			Msg("Fetcher failed")
 	}
 
-	log.Info().Msg("Fetched successfully finished")
+	log.Info().Msg("Fetcher successfully finished")
 }
