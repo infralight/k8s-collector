@@ -11,6 +11,7 @@ import (
 	"reflect"
 	"sort"
 	"testing"
+	"testing/fstest"
 
 	"github.com/jgroeneveld/trial/assert"
 	"github.com/rs/zerolog"
@@ -110,39 +111,28 @@ func TestRun(t *testing.T) {
 
 			defer ts.Close()
 
-			// Add a ConfigMap that points the collector to talk to the mock
-			// HTTP server
-			test.objs = append(test.objs, &v1.ConfigMap{
-				TypeMeta: metav1.TypeMeta{
-					Kind: "ConfigMap",
-				},
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      DefaultConfigMapName,
-					Namespace: "default",
-				},
-				Data: map[string]string{
-					"endpoint":                       ts.URL,
-					"collector.resources.configMaps": "false",
-				},
-			})
-
 			// Create a fake Kubernetes client
 			client := fake.NewSimpleClientset(test.objs...)
 
 			// create a collector instance
 			f := NewCollector("test", &logger, client)
 
-			ctx := context.Background()
+			// Create an in-memory filesystem for configuration files
+			// create a collector instance
+			f.SetFS(&fstest.MapFS{
+				"etc/config/endpoint":                       &fstest.MapFile{Data: []byte(ts.URL)},
+				"etc/config/collector.resources.configMaps": &fstest.MapFile{Data: []byte("false")},
+			})
 
 			os.Setenv(AccessKeyEnvVar, "bla")
 			os.Setenv(SecretKeyEnvVar, "bla")
-			err := f.loadConfig(ctx)
+			err := f.loadConfig()
 			if err != nil {
 				t.Fatalf("Failed configuring collector: %s", err)
 			}
 
 			// run the collector
-			objects := f.collect(ctx)
+			objects := f.collect(context.Background())
 
 			err = f.send(objects)
 			if test.expErr {

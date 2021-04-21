@@ -1,24 +1,18 @@
 package collector
 
 import (
-	"context"
 	"errors"
 	"fmt"
+	"io/fs"
 	"os"
 	"strconv"
 	"strings"
-
-	v1 "k8s.io/api/core/v1"
-	k8serr "k8s.io/apimachinery/pkg/api/errors"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 const (
-	AccessKeyEnvVar      = "INFRALIGHT_ACCESS_KEY"
-	SecretKeyEnvVar      = "INFRALIGHT_SECRET_KEY" // nolint: gosec
-	DefaultEndpoint      = "https://prodapi.infralight.cloud"
-	DefaultNamespace     = "default"
-	DefaultConfigMapName = "infralight-k8s-collector-config"
+	AccessKeyEnvVar = "INFRALIGHT_ACCESS_KEY"
+	SecretKeyEnvVar = "INFRALIGHT_SECRET_KEY" // nolint: gosec
+	DefaultEndpoint = "https://prodapi.infralight.cloud"
 )
 
 var (
@@ -52,7 +46,7 @@ type CollectorConfig struct {
 	FetchClusterRoles           bool
 }
 
-func (f *Collector) loadConfig(ctx context.Context) error {
+func (f *Collector) loadConfig() error {
 	// load Infralight API Key from the environment, this is required
 	accessKey := os.Getenv(AccessKeyEnvVar)
 	secretKey := os.Getenv(SecretKeyEnvVar)
@@ -60,55 +54,34 @@ func (f *Collector) loadConfig(ctx context.Context) error {
 		return ErrAccessKeys
 	}
 
-	// now load our optional ConfigMap from Kubernetes
-	config, err := f.api.CoreV1().
-		ConfigMaps(f.namespace).
-		Get(ctx, f.configMapName, metav1.GetOptions{})
-	if err != nil {
-		if k8serr.IsNotFound(err) {
-			// configuration doesn't exist, warn but do not fail, we'll use our
-			// defaults
-			f.log.Warn().
-				Str("namespace", f.namespace).
-				Str("config_map_name", f.configMapName).
-				Msg("ConfigMap doesn't exist, using defaults")
-
-			config = &v1.ConfigMap{
-				Data: make(map[string]string),
-			}
-		} else {
-			return fmt.Errorf("failed loading ConfigMap: %w", err)
-		}
-	}
-
 	f.config = &CollectorConfig{
 		AccessKey:                   accessKey,
 		SecretKey:                   secretKey,
-		Endpoint:                    strings.TrimSuffix(parseOne(config.Data["endpoint"], DefaultEndpoint), "/"),
-		Namespace:                   parseOne(config.Data["collector.watchNamespace"], ""),
-		IgnoreNamespaces:            parseMultiple(config.Data["collector.ignoreNamespaces"], nil),
-		FetchEvents:                 parseBool(config.Data["collector.resources.events"], true),
-		FetchReplicationControllers: parseBool(config.Data["collector.resources.replicationControllers"], true),
-		FetchServices:               parseBool(config.Data["collector.resources.services"], true),
-		FetchServiceAccounts:        parseBool(config.Data["collector.resources.serviceAccounts"], true),
-		FetchPods:                   parseBool(config.Data["collector.resources.pods"], true),
-		FetchNodes:                  parseBool(config.Data["collector.resources.nodes"], true),
-		FetchPersistentVolumes:      parseBool(config.Data["collector.resources.persistentVolumes"], true),
-		FetchPersistentVolumeClaims: parseBool(config.Data["collector.resources.persistentVolumeClaims"], true),
-		FetchNamespaces:             parseBool(config.Data["collector.resources.namespaces"], true),
-		FetchConfigMaps:             parseBool(config.Data["collector.resources.configMaps"], true),
-		FetchSecrets:                parseBool(config.Data["collector.resources.secrets"], false),
-		FetchDeployments:            parseBool(config.Data["collector.resources.deployments"], true),
-		FetchDaemonSets:             parseBool(config.Data["collector.resources.daemonSets"], true),
-		FetchReplicaSets:            parseBool(config.Data["collector.resources.replicaSets"], true),
-		FetchStatefulSets:           parseBool(config.Data["collector.resources.statefulSets"], true),
-		FetchJobs:                   parseBool(config.Data["collector.resources.jobs"], true),
-		FetchCronJobs:               parseBool(config.Data["collector.resources.cronJobs"], true),
-		FetchIngresses:              parseBool(config.Data["collector.resources.ingresses"], true),
-		FetchClusterRoles:           parseBool(config.Data["collector.resources.clusterRoles"], true),
+		Endpoint:                    strings.TrimSuffix(parseOne(f.etcConfig("endpoint"), DefaultEndpoint), "/"),
+		Namespace:                   parseOne(f.etcConfig("collector.watchNamespace"), ""),
+		IgnoreNamespaces:            parseMultiple(f.etcConfig("collector.ignoreNamespaces"), nil),
+		FetchEvents:                 parseBool(f.etcConfig("collector.resources.events"), true),
+		FetchReplicationControllers: parseBool(f.etcConfig("collector.resources.replicationControllers"), true),
+		FetchServices:               parseBool(f.etcConfig("collector.resources.services"), true),
+		FetchServiceAccounts:        parseBool(f.etcConfig("collector.resources.serviceAccounts"), true),
+		FetchPods:                   parseBool(f.etcConfig("collector.resources.pods"), true),
+		FetchNodes:                  parseBool(f.etcConfig("collector.resources.nodes"), true),
+		FetchPersistentVolumes:      parseBool(f.etcConfig("collector.resources.persistentVolumes"), true),
+		FetchPersistentVolumeClaims: parseBool(f.etcConfig("collector.resources.persistentVolumeClaims"), true),
+		FetchNamespaces:             parseBool(f.etcConfig("collector.resources.namespaces"), true),
+		FetchConfigMaps:             parseBool(f.etcConfig("collector.resources.configMaps"), true),
+		FetchSecrets:                parseBool(f.etcConfig("collector.resources.secrets"), false),
+		FetchDeployments:            parseBool(f.etcConfig("collector.resources.deployments"), true),
+		FetchDaemonSets:             parseBool(f.etcConfig("collector.resources.daemonSets"), true),
+		FetchReplicaSets:            parseBool(f.etcConfig("collector.resources.replicaSets"), true),
+		FetchStatefulSets:           parseBool(f.etcConfig("collector.resources.statefulSets"), true),
+		FetchJobs:                   parseBool(f.etcConfig("collector.resources.jobs"), true),
+		FetchCronJobs:               parseBool(f.etcConfig("collector.resources.cronJobs"), true),
+		FetchIngresses:              parseBool(f.etcConfig("collector.resources.ingresses"), true),
+		FetchClusterRoles:           parseBool(f.etcConfig("collector.resources.clusterRoles"), true),
 	}
 
-	f.log.Debug().Interface("map", f.config).Msg("Loaded config map")
+	f.log.Info().Interface("map", f.config).Msg("Loaded collector configuration")
 
 	return nil
 }
@@ -165,4 +138,24 @@ func includes(list []string, value string) bool {
 	}
 
 	return false
+}
+
+func (f *Collector) etcConfig(name string) string {
+	data, err := fs.ReadFile(
+		f.fs,
+		fmt.Sprintf("%s/%s", strings.TrimPrefix(f.configDir, "/"), name),
+	)
+	if err != nil {
+		// only log this error if it's _not_ a "no such file or directory"
+		// error
+		if !os.IsNotExist(err) {
+			f.log.Warn().
+				Err(err).
+				Str("key", name).
+				Msg("Failed loading configuration key")
+		}
+		return ""
+	}
+
+	return string(data)
 }

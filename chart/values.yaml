@@ -1,0 +1,19 @@
+clusterId: "default"
+schedule: "*/15 * * * *"
+
+apiEndpoint: "https://prodapi.infralight.cloud"
+accessKey: null
+secretKey: null
+
+image:
+  repository: infralight/k8s-collector
+  pullPolicy: IfNotPresent
+
+serviceAccount:
+  name: "infralight-service-account"
+  annotations: {}
+
+clusterRole:
+  name: "infralight-role"
+
+collectSecrets: false

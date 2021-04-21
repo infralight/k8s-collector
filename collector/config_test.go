@@ -1,16 +1,13 @@
 package collector
 
 import (
-	"context"
 	"errors"
 	"os"
 	"testing"
+	"testing/fstest"
 
 	"github.com/jgroeneveld/trial/assert"
 	"github.com/rs/zerolog"
-	v1 "k8s.io/api/core/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/kubernetes/fake"
 )
 
@@ -22,7 +19,7 @@ func Test_loadConfig(t *testing.T) {
 		name      string
 		accessKey string
 		secretKey string
-		objs      []runtime.Object
+		etcFiles  *fstest.MapFS
 		expErr    error
 		expConfig CollectorConfig
 	}{
@@ -63,23 +60,12 @@ func Test_loadConfig(t *testing.T) {
 			name:      "secret, config",
 			accessKey: "bla",
 			secretKey: "bla2",
-			objs: []runtime.Object{
-				&v1.ConfigMap{
-					TypeMeta: metav1.TypeMeta{
-						Kind: "ConfigMap",
-					},
-					ObjectMeta: metav1.ObjectMeta{
-						Name:      DefaultConfigMapName,
-						Namespace: "default",
-					},
-					Data: map[string]string{
-						"endpoint":                        "http://localhost:5000/\n",
-						"collector.watchNamespace":        "namespace",
-						"collector.ignoreNamespaces":      "one\ntwo\n\n",
-						"collector.resources.secrets":     "\ntrue   \n",
-						"collector.resources.deployments": "false\n",
-					},
-				},
+			etcFiles: &fstest.MapFS{
+				"etc/config/endpoint":                        &fstest.MapFile{Data: []byte("http://localhost:5000/\n")},
+				"etc/config/collector.watchNamespace":        &fstest.MapFile{Data: []byte("namespace")},
+				"etc/config/collector.ignoreNamespaces":      &fstest.MapFile{Data: []byte("one\ntwo\n\n")},
+				"etc/config/collector.resources.secrets":     &fstest.MapFile{Data: []byte("\ntrue   \n")},
+				"etc/config/collector.resources.deployments": &fstest.MapFile{Data: []byte("false\n")},
 			},
 			expConfig: CollectorConfig{
 				AccessKey:                   "bla",
@@ -113,10 +99,17 @@ func Test_loadConfig(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			// Create a fake Kubernetes client
-			client := fake.NewSimpleClientset(test.objs...)
+			client := fake.NewSimpleClientset()
+
+			// Create an in-memory filesystem for configuration files
+			memFs := test.etcFiles
+			if memFs == nil {
+				memFs = &fstest.MapFS{}
+			}
 
 			// create a collector instance
 			f := NewCollector("test", &logger, client)
+			f.SetFS(memFs)
 
 			if test.accessKey != "" {
 				os.Setenv(AccessKeyEnvVar, test.accessKey)
@@ -126,7 +119,7 @@ func Test_loadConfig(t *testing.T) {
 				os.Unsetenv(SecretKeyEnvVar)
 			}
 
-			err := f.loadConfig(context.Background())
+			err := f.loadConfig()
 			if test.expErr != nil {
 				assert.MustNotBeNil(t, err, "error must not be nil")
 				assert.True(t, errors.Is(err, test.expErr), "error must match")

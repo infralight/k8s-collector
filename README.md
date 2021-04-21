@@ -125,31 +125,25 @@ disabled by default and thus is commented out in the sample file.
 
 * [Kubernetes](https://kubernetes.io/) v1.15+
 * [kubectl](https://kubernetes.io/docs/tasks/tools/#kubectl) v1.18+
+* [Helm](https://helm.sh/) v3.5+
 
 ### Quick Start
 
-1. Create the Cluster Role.
+1. Until the collector's Helm Chart is publically available, please clone this
+   project and run this from the root directory:
     ```sh
-    kubectl create -f data/clusterrole.sample.yaml
+    helm install infralight ./chart \
+        --set accessKey=<key> \
+        --set secretKey=<key>
     ```
-2. Bind the default service account to the Cluster Role:
-    ```sh
-    kubectl create -f data/clusterrolebinding.sample.yaml
-    ```
-3. Grant the default service account access to the role binding:
-    ```sh
-    kubectl create clusterrolebinding default-view --clusterrole=infralight-view --serviceaccount=default:default
-    ```
-4. Create the K8s CronJob for the collector:
-    ```sh
-    kubectl create -f cronjob.sample.yaml
-    ```
-5. Inspect the job using the command line:
+2. Inspect the job using the command line:
     ```sh
     kubectl get jobs --watch
     ```
 
-The sample file triggers the job at 15 minute intervals.
+By default, the collector is triggered at 15 minute intervals. Set the
+`schedule` option to change the schedule. This option accepts a cron-like string,
+such as `"*/15 * * * *"`.
 
 ## Local Development
 
@@ -163,6 +157,7 @@ use `minikube` for local development.
 * [Docker](https://www.docker.com/) v20.10+
 * [minikube](https://minikube.sigs.k8s.io/docs/) v1.18+
 * [kubectl](https://kubernetes.io/docs/tasks/tools/#kubectl) v1.18+
+* [Helm](https://helm.sh/) v3.5+
 * [golangci-lint](https://golangci-lint.run/) v1.35+
 
 ### Unit Tests and Static Code Analysis
@@ -183,55 +178,47 @@ $ golangci-lint run ./...
 
 ### Quick Start
 
-1. Make sure the Docker daemon is running.
+1. Make sure you have the [App Server](https://github.com/infralight/app-server) running. Create an access/secret keypair
+   through the User Management page of the dashboard.
 2. Start minikube on top of Docker:
     ```sh
     minikube start --driver=docker
     ```
-3. Create the Cluster Role.
+3. Load environment variables so the Docker client works against the local
+   `minikube` Docker daemon:
     ```sh
-    kubectl create -f data/clusterrole.sample.yaml
+    eval $(minikube docker-env)
     ```
-4. Bind the default service account to the Cluster Role:
+4. Build the collector's Docker image:
     ```sh
-    kubectl create -f data/clusterrolebinding.sample.yaml
+    docker build -t infralight/k8s-collector:1.0.0 .
     ```
-5. Grant the default service account access to the role binding:
+5. Install the collector via Helm (from the project's root directory):
     ```sh
-    kubectl create clusterrolebinding default-view --clusterrole=infralight-view --serviceaccount=default:default
+    helm install infralight ./chart \
+        --set accessKey=<key> \
+        --set secretKey=<key> \
+        --set apiEndpoint=<api endpoint>
     ```
-6. Create the ConfigMap for the collector, if needed:
-    ```sh
-    kubectl create -f data/configmap.sample.yaml
-    ```
-7. To run the collector out-of-cluster, execute:
+6. While the collector will now be automatically triggered every 15 minutes,
+   you can also run it out-of-cluster at will, directly from the code. Simply
+   execute:
     ```sh
     INFRALIGHT_ACCESS_KEY=<accessKey> INFRALIGHT_SECRET_KEY=<secretKey> \
-        go run main.go -external ~/.kube/config -debug <clusterId>
+        go run main.go \
+        -external ~/.kube/config \
+        -config `pwd`/.config \
+        -debug \
+        <clusterId>
     ```
-8. To run the collector in-cluster, more steps are required:
-    1. Load environment variables so the Docker client works against the local `minikube` Docker daemon:
-        ```sh
-        eval $(minikube docker-env)
-        ```
-    2. Build the collector's Docker image:
-        ```sh
-        docker build -t infralight/k8s-collector:1.0.0 .
-        ```
-    3. Create the secret containing the API key:
-        ```sh
-        kubectl create -f data/secret.sample.yaml
-        ```
-    4. Create the K8s CronJob for the collector:
-        ```sh
-        kubectl create -f data/cronjob.sample.yaml
-        ```
-    5. Inspect the job using the command line or the minikube Dashboard:
-        ```sh
-        minikube dashboard
-        ```
-    6. Cleanup:
-        ```sh
-        kubectl delete cronjob infralight-k8s-collector
-        eval $(minikube docker-env -u)
-        ```
+    Note that this expects the App Server to be available at http://localhost:7777,
+    modify the [.config/endpoint](.config/endpoint) file if necessary.
+8. Inspect the job using the command line or the minikube dashboard:
+    ```sh
+    minikube dashboard
+    ```
+9. Cleanup:
+    ```sh
+    helm uninstall infralight
+    eval $(minikube docker-env -u)
+    ```

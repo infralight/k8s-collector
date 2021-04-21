@@ -1,7 +1,7 @@
 kind: ClusterRole
 apiVersion: rbac.authorization.k8s.io/v1
 metadata:
-  name: infralight-view
+  name: {{ .Values.clusterRole.name }}
 rules:
   - verbs:
       - get
@@ -25,7 +25,9 @@ rules:
       - events
       - nodes
       - namespaces
-      #- secrets
+{{- if .Values.collectSecrets}}
+      - secrets
+{{- end }}
   - verbs:
       - list
     apiGroups:

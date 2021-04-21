@@ -3,7 +3,9 @@ package collector
 import (
 	"context"
 	"fmt"
+	"io/fs"
 	"net/http"
+	"os"
 	"regexp"
 
 	"github.com/ido50/requests"
@@ -12,13 +14,30 @@ import (
 )
 
 type Collector struct {
-	clusterID     string
-	log           *zerolog.Logger
-	api           kubernetes.Interface
-	namespace     string
-	configMapName string
-	config        *CollectorConfig
-	accessToken   string
+	log *zerolog.Logger
+
+	// client object for the Kubernetes API server
+	api kubernetes.Interface
+
+	// the JWT access token used to authenticate with the Infralight App server.
+	// this is automatically generated
+	accessToken string
+
+	// the unique identifier of the cluster we're collecting data from (must be
+	// provided externally)
+	clusterID string
+
+	// file system object from which configuration files are read. by default,
+	// this is the local file system; an in-memory file system is used in the
+	// unit tests
+	fs fs.FS
+
+	// the directory inside fs where configuration files are stored. by default,
+	// this is /etc/config
+	configDir string
+
+	// the collector's configuration
+	config *CollectorConfig
 }
 
 // K8sObject is a pointless struct type that we have no choice but create due to
@@ -47,21 +66,21 @@ func NewCollector(
 	api kubernetes.Interface,
 ) *Collector {
 	return &Collector{
-		log:           log,
-		api:           api,
-		clusterID:     clusterID,
-		namespace:     DefaultNamespace,
-		configMapName: DefaultConfigMapName,
+		log:       log,
+		api:       api,
+		clusterID: clusterID,
+		fs:        &localFS{},
+		configDir: "/etc/config",
 	}
 }
 
-func (f *Collector) SetNamespace(ns string) *Collector {
-	f.namespace = ns
+func (f *Collector) SetFS(fs fs.FS) *Collector {
+	f.fs = fs
 	return f
 }
 
-func (f *Collector) SetConfigMapName(name string) *Collector {
-	f.configMapName = name
+func (f *Collector) SetConfigDir(dir string) *Collector {
+	f.configDir = dir
 	return f
 }
 
@@ -78,7 +97,7 @@ func (f *Collector) Run(ctx context.Context) error {
 	}
 
 	// load our configuration from a ConfigMap
-	err := f.loadConfig(ctx)
+	err := f.loadConfig()
 	if err != nil {
 		return fmt.Errorf("failed loading configuration map: %w", err)
 	}
@@ -178,4 +197,10 @@ func (f *Collector) send(objects []K8sObject) error {
 			Objects:   objects,
 		}).
 		Run()
+}
+
+type localFS struct{}
+
+func (fs *localFS) Open(name string) (fs.File, error) {
+	return os.Open("/" + name)
 }
