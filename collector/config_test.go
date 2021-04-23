@@ -24,17 +24,26 @@ func Test_loadConfig(t *testing.T) {
 		expConfig CollectorConfig
 	}{
 		{
-			name:   "no secret, no config",
+			name:   "no secret",
 			expErr: ErrAccessKeys,
 		},
 		{
-			name:      "secret, no config",
-			accessKey: "bla",
-			secretKey: "bla2",
+			name:      "no endpoint",
+			accessKey: "access",
+			secretKey: "secret",
+			expErr:    ErrEndpoint,
+		},
+		{
+			name:      "no config",
+			accessKey: "access",
+			secretKey: "secret",
+			etcFiles: &fstest.MapFS{
+				"etc/config/endpoint": &fstest.MapFile{Data: []byte("http://localhost:5000/api\n")},
+			},
 			expConfig: CollectorConfig{
-				AccessKey:                   "bla",
-				SecretKey:                   "bla2",
-				Endpoint:                    DefaultEndpoint,
+				AccessKey:                   "access",
+				SecretKey:                   "secret",
+				Endpoint:                    "http://localhost:5000/api",
 				FetchEvents:                 true,
 				FetchConfigMaps:             true,
 				FetchReplicationControllers: true,
@@ -57,20 +66,20 @@ func Test_loadConfig(t *testing.T) {
 			},
 		},
 		{
-			name:      "secret, config",
-			accessKey: "bla",
-			secretKey: "bla2",
+			name:      "config",
+			accessKey: "access",
+			secretKey: "secret",
 			etcFiles: &fstest.MapFS{
-				"etc/config/endpoint":                        &fstest.MapFile{Data: []byte("http://localhost:5000/\n")},
+				"etc/config/endpoint":                        &fstest.MapFile{Data: []byte("http://localhost:5000/api\n")},
 				"etc/config/collector.watchNamespace":        &fstest.MapFile{Data: []byte("namespace")},
 				"etc/config/collector.ignoreNamespaces":      &fstest.MapFile{Data: []byte("one\ntwo\n\n")},
 				"etc/config/collector.resources.secrets":     &fstest.MapFile{Data: []byte("\ntrue   \n")},
 				"etc/config/collector.resources.deployments": &fstest.MapFile{Data: []byte("false\n")},
 			},
 			expConfig: CollectorConfig{
-				AccessKey:                   "bla",
-				SecretKey:                   "bla2",
-				Endpoint:                    "http://localhost:5000",
+				AccessKey:                   "access",
+				SecretKey:                   "secret",
+				Endpoint:                    "http://localhost:5000/api",
 				Namespace:                   "namespace",
 				IgnoreNamespaces:            []string{"one", "two"},
 				FetchEvents:                 true,

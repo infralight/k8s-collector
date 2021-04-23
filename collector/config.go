@@ -12,11 +12,11 @@ import (
 const (
 	AccessKeyEnvVar = "INFRALIGHT_ACCESS_KEY"
 	SecretKeyEnvVar = "INFRALIGHT_SECRET_KEY" // nolint: gosec
-	DefaultEndpoint = "https://prodapi.infralight.cloud"
 )
 
 var (
 	ErrAccessKeys = errors.New("access and secret keys must be provided")
+	ErrEndpoint   = errors.New("Infralight endpoint must be provided")
 )
 
 type CollectorConfig struct {
@@ -57,7 +57,7 @@ func (f *Collector) loadConfig() error {
 	f.config = &CollectorConfig{
 		AccessKey:                   accessKey,
 		SecretKey:                   secretKey,
-		Endpoint:                    strings.TrimSuffix(parseOne(f.etcConfig("endpoint"), DefaultEndpoint), "/"),
+		Endpoint:                    strings.TrimSuffix(parseOne(f.etcConfig("endpoint"), ""), "/"),
 		Namespace:                   parseOne(f.etcConfig("collector.watchNamespace"), ""),
 		IgnoreNamespaces:            parseMultiple(f.etcConfig("collector.ignoreNamespaces"), nil),
 		FetchEvents:                 parseBool(f.etcConfig("collector.resources.events"), true),
@@ -79,6 +79,10 @@ func (f *Collector) loadConfig() error {
 		FetchCronJobs:               parseBool(f.etcConfig("collector.resources.cronJobs"), true),
 		FetchIngresses:              parseBool(f.etcConfig("collector.resources.ingresses"), true),
 		FetchClusterRoles:           parseBool(f.etcConfig("collector.resources.clusterRoles"), true),
+	}
+
+	if f.config.Endpoint == "" {
+		return ErrEndpoint
 	}
 
 	f.log.Info().Interface("map", f.config).Msg("Loaded collector configuration")

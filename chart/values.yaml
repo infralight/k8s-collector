@@ -1,7 +1,7 @@
 clusterId: "default"
 schedule: "*/15 * * * *"
 
-apiEndpoint: "https://prodapi.infralight.cloud"
+apiEndpoint: null
 accessKey: null
 secretKey: null
 

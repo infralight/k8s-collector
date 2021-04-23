@@ -5,16 +5,14 @@
 <!-- vim-markdown-toc GFM -->
 
 * [Overview](#overview)
+* [Quick Start](#quick-start)
 * [Configuration](#configuration)
-* [OCI Image](#oci-image)
-* [Server-Side Notes](#server-side-notes)
-* [Production Set-Up](#production-set-up)
+* [Development](#development)
     * [Requirements](#requirements)
-    * [Quick Start](#quick-start)
-* [Local Development](#local-development)
-    * [Requirements](#requirements-1)
-    * [Unit Tests and Static Code Analysis](#unit-tests-and-static-code-analysis)
+    * [Server-Side Notes](#server-side-notes)
     * [Quick Start](#quick-start-1)
+    * [Unit Tests and Static Code Analysis](#unit-tests-and-static-code-analysis)
+* [License](#license)
 
 <!-- vim-markdown-toc -->
 
@@ -41,45 +39,87 @@ but logic may be added to the collector to receive instructions from Infralight
 to fetch more objects, or to use the Go client's [discovery](https://pkg.go.dev/k8s.io/client-go@v1.5.2/1.5/discovery) library
 to fetch objects of other types.
 
-## Configuration
+## Quick Start
 
-Since Kubernetes does not provide a way to access a unique name or ID for a
-cluster, a cluster identifier must be provided to the collector. It can either
-be provided via a command line argument, or via the `CLUSTER_ID` environment
-variable. The command line argument has precedence over the env var. The cluster
-ID must only contain lowercase alphanumeric characters, dashes and underscore
-(spaces are not allowed).
+Infralight's Kubernetes Collector requires:
 
-The collector must also be configured with an Infralight-provided access and secret
-keys in order to be able to send data to Infralight. These keys musy be provided
-as environment variables called `INFRALIGHT_ACCESS_KEY` and `INFRALIGHT_SECRET_KEY`,
-respectively. It is recommended that these keys are stored as a Kubernetes
-[Secret](https://kubernetes.io/docs/concepts/configuration/secret/) and automatically injected into the collector's pod.
-A [sample secret template](data/secret.sample.yaml) is included in the repository.
+* [Kubernetes](https://kubernetes.io/) v1.15+
+* [kubectl](https://kubernetes.io/docs/tasks/tools/#kubectl) v1.18+
+* [Helm](https://helm.sh/) v3.5+
 
-The collector's behavior may also be configured and modified via an optional
-Kubernetes [ConfigMap](https://kubernetes.io/docs/concepts/configuration/configmap/). This allows changing the HTTP endpoint to which data
-is sent, enable/disable the collection of object types, and more. Currently,
-this ConfigMap must be named "infralight-k8s-collector-config" to be accepted by
-the collector. A [sample ConfigMap template](data/configmap.sample.yaml) is
-included in the repository.
+To start using the collector, follow these simple steps:
 
-If a ConfigMap does not exist, default configuration options will be used. By
-default, secrets will _not_ be collected, but all other supported object types
-will. See [here](https://github.com/infralight/k8s-collector/blob/main/collector/config.go#L81) for a list of supported configuration options and their
-default values.
+1. Use the Kubernetes Integration wizard in the Infralight dashboard to create
+   an access keypair for a Kubernetes Cluster.
+2. Install the collector on the cluster using [Helm](https://helm.sh/), with the
+   data returned from the wizard:
 
-## OCI Image
+    ```sh
+    helm repo add infralight https://infralight.github.io/k8s-collector
+    helm install infralight infralight/infralight-k8s-collector \
+        --set accessKey=<access_key> \
+        --set secretKey=<secret_key> \
+        --set apiEndpoint=<api_endpoint> \
+        --set clusterId=<cluster_id>
+    ```
 
-A standard [Dockerfile](Dockerfile) is included to package the collector as an OCI image.
-This Dockerfile uses the official [Alpine-based Go image](https://hub.docker.com/_/golang) from Docker Hub
-with a [multi-stage build](https://docs.docker.com/develop/develop-images/multistage-build/) process to compile the collector into a
+The collector's OCI-compliant Docker image is hosted in Docker Hub. The image is
+built from a [Dockerfile](Dockerfile) that uses an Alpine-based Go image
+and employs a [multi-stage build](https://docs.docker.com/develop/develop-images/multistage-build/) process to compile the collector into a
 [statically-linked binary](https://en.wikipedia.org/wiki/Static_library). The resulting image does not use any base layer,
-thus keeping its size as small as possible.
+thus keeping its size as small as possible and improving security.
 
 The image is named `infralight/k8s-collector`.
 
-## Server-Side Notes
+## Configuration
+
+Please review the [chart/values.yaml](chart/values.yaml) file for a list of
+configuration options that can be modified when installing the Helm Chart.
+You may wish to modify the "schedule" setting, which controls the schedule for
+the collector's execution. By default, the collector is executed once every 15
+minutes. This can be changed with a [cron-compatible string](https://cron.help/).
+
+When following the steps in the [Quick Start](#quick-start) section above, the wizard will
+instruct you to assign a cluster ID for the installation. This is necessary
+because Kubernetes does not provide a way to access a unique name or ID for a
+cluster, a cluster identifier must be provided to the collector.
+
+The chart provides this cluster ID to the collector via the `CLUSTER_ID` environment
+variable. The cluster ID must only contain lowercase alphanumeric characters,
+dashes and underscore (spaces are not allowed).
+
+The collector must also be configured with an Infralight-provided access and secret
+keys in order to be able to send data to Infralight. These keys are stored by the
+chart as Kubernetes Secrets, and provided to the collector via the
+`INFRALIGHT_ACCESS_KEY` and `INFRALIGHT_SECRET_KEY` environment variables,
+respectively.
+
+The collector's behavior may also be configured and modified via an optional
+Kubernetes [ConfigMap](https://kubernetes.io/docs/concepts/configuration/configmap/). The complete list of configuration options
+supported are not exposed via the chart's values file, but the resulting ConfigMap
+can be manually modified, if necessary.
+
+Note that by default, secrets are _not_ collected, but all other supported object types
+will. See [here](https://github.com/infralight/k8s-collector/blob/main/collector/config.go#L81) for a list of supported configuration options and their
+default values. To enable collection of secrets, provide `--set collectSecrets=true`
+when installing the chart.
+
+## Development
+
+During development, the collector may be run outside of the cluster without
+having to package it in an image, or inside the cluster. It is recommended to
+use `minikube` for local development.
+
+### Requirements
+
+* [Go](https://golang.org/) v1.16+
+* [Docker](https://www.docker.com/) v20.10+
+* [minikube](https://minikube.sigs.k8s.io/docs/) v1.18+
+* [kubectl](https://kubernetes.io/docs/tasks/tools/#kubectl) v1.18+
+* [Helm](https://helm.sh/) v3.5+
+* [golangci-lint](https://golangci-lint.run/) v1.35+
+
+### Server-Side Notes
 
 The collector sends the collected objects to the Infralight endpoint serialized
 via JSON. Requests will be compressed using the gzip algorithm, unless
@@ -106,76 +146,6 @@ See [this](https://pkg.go.dev/k8s.io/api/core/v1#Pod) for an example of the stru
 When a request is handled by the Infralight endpoint, it is expected to return
 a [204 No Content](https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/204) response with no body, unless an error has occurred.
 
-## Production Set-Up
-
-In production, the collector should be configured as a Kubernetes [CronJob](https://kubernetes.io/docs/concepts/workloads/controllers/cron-jobs/),
-and provided access to collect information from the cluster via a
-[service account](https://kubernetes.io/docs/tasks/configure-pod-container/configure-service-account/).
-
-A [sample CronJob template](data/cronjob.sample.yaml) is included in the repository.
-Permissions must be provided to the service account via a Cluster Role and a
-Cluster Role Binding. Sample files for both ([Cluster Role](data/clusterrole.sample.yaml),
-[Cluster Role Binding](data/clusterrolebinding.sample.yaml)) are included in the repository.
-These can be provided as-is to customers, but they may wish to modify them,
-depending on the configuration and the type of Kubernetes resources they wish
-to provide Infralight access to. For example, permission to view secrets is
-disabled by default and thus is commented out in the sample file.
-
-### Requirements
-
-* [Kubernetes](https://kubernetes.io/) v1.15+
-* [kubectl](https://kubernetes.io/docs/tasks/tools/#kubectl) v1.18+
-* [Helm](https://helm.sh/) v3.5+
-
-### Quick Start
-
-1. Until the collector's Helm Chart is publically available, please clone this
-   project and run this from the root directory:
-    ```sh
-    helm install infralight ./chart \
-        --set accessKey=<key> \
-        --set secretKey=<key>
-    ```
-2. Inspect the job using the command line:
-    ```sh
-    kubectl get jobs --watch
-    ```
-
-By default, the collector is triggered at 15 minute intervals. Set the
-`schedule` option to change the schedule. This option accepts a cron-like string,
-such as `"*/15 * * * *"`.
-
-## Local Development
-
-During development, the collector may be run outside of the cluster without
-having to package it in an image, or inside the cluster. It is recommended to
-use `minikube` for local development.
-
-### Requirements
-
-* [Go](https://golang.org/) v1.16+
-* [Docker](https://www.docker.com/) v20.10+
-* [minikube](https://minikube.sigs.k8s.io/docs/) v1.18+
-* [kubectl](https://kubernetes.io/docs/tasks/tools/#kubectl) v1.18+
-* [Helm](https://helm.sh/) v3.5+
-* [golangci-lint](https://golangci-lint.run/) v1.35+
-
-### Unit Tests and Static Code Analysis
-
-The collector includes standard Go unit tests, and uses [golangci-lint](https://golangci-lint.run/) to run a
-comprehensive suite of static code analysis tools. The GitHub repository is set-up
-to compile the collector, run the unit tests and execute the static code analysis
-tools on every commit. The Dockerfile is also set-up to do the same thing when
-building the image.
-
-Locally, these steps can be executed like so:
-
-```sh
-$ go build
-$ go test ./...
-$ golangci-lint run ./...
-```
-
 ### Quick Start
 
 1. Make sure you have the [App Server](https://github.com/infralight/app-server) running. Create an access/secret keypair
@@ -196,9 +166,9 @@ $ golangci-lint run ./...
 5. Install the collector via Helm (from the project's root directory):
     ```sh
     helm install infralight ./chart \
-        --set accessKey=<key> \
-        --set secretKey=<key> \
-        --set apiEndpoint=<api endpoint>
+        --set accessKey=<access_key> \
+        --set secretKey=<secret_key> \
+        --set apiEndpoint=<api_endpoint>
     ```
 6. While the collector will now be automatically triggered every 15 minutes,
    you can also run it out-of-cluster at will, directly from the code. Simply
@@ -211,8 +181,9 @@ $ golangci-lint run ./...
         -debug \
         <clusterId>
     ```
-    Note that this expects the App Server to be available at http://localhost:7777,
-    modify the [.config/endpoint](.config/endpoint) file if necessary.
+    Note that you must first create a ".config" directory in the project root,
+    and at the very least store the API endpoint in a file called ".config/endpoint".
+    Other configuration options can be included as well.
 8. Inspect the job using the command line or the minikube dashboard:
     ```sh
     minikube dashboard
@@ -222,3 +193,23 @@ $ golangci-lint run ./...
     helm uninstall infralight
     eval $(minikube docker-env -u)
     ```
+
+### Unit Tests and Static Code Analysis
+
+The collector includes standard Go unit tests, and uses [golangci-lint](https://golangci-lint.run/) to run a
+comprehensive suite of static code analysis tools. The GitHub repository is set-up
+to compile the collector, run the unit tests and execute the static code analysis
+tools on every commit. The Dockerfile is also set-up to do the same thing when
+building the image.
+
+Locally, these steps can be executed like so:
+
+```sh
+$ go build
+$ go test ./...
+$ golangci-lint run ./...
+```
+
+## License
+
+This project is distributed under the terms of the [Apache License 2.0](LICENSE).
