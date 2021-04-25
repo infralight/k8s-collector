@@ -44,7 +44,6 @@ to fetch objects of other types.
 Infralight's Kubernetes Collector requires:
 
 * [Kubernetes](https://kubernetes.io/) v1.15+
-* [kubectl](https://kubernetes.io/docs/tasks/tools/#kubectl) v1.18+
 * [Helm](https://helm.sh/) v3.5+
 
 To start using the collector, follow these simple steps:
@@ -63,13 +62,13 @@ To start using the collector, follow these simple steps:
         --set clusterId=<cluster_id>
     ```
 
-The collector's OCI-compliant Docker image is hosted in Docker Hub. The image is
+The collector's OCI-compliant Docker image is [hosted in Docker Hub](https://hub.docker.com/r/infralightio/k8s-collector). The image is
 built from a [Dockerfile](Dockerfile) that uses an Alpine-based Go image
 and employs a [multi-stage build](https://docs.docker.com/develop/develop-images/multistage-build/) process to compile the collector into a
 [statically-linked binary](https://en.wikipedia.org/wiki/Static_library). The resulting image does not use any base layer,
 thus keeping its size as small as possible and improving security.
 
-The image is named `infralight/k8s-collector`.
+The image is named `infralightio/k8s-collector`.
 
 ## Configuration
 
@@ -161,7 +160,7 @@ a [204 No Content](https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/204)
     ```
 4. Build the collector's Docker image:
     ```sh
-    docker build -t infralight/k8s-collector:1.0.0 .
+    docker build -t infralightio/k8s-collector:1.0.0 .
     ```
 5. Install the collector via Helm (from the project's root directory):
     ```sh
