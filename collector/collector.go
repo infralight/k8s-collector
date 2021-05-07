@@ -189,12 +189,11 @@ func (f *Collector) collect(ctx context.Context) (objects []K8sObject) {
 func (f *Collector) send(objects []K8sObject) error {
 	return requests.NewClient(f.config.Endpoint).
 		Header("Authorization", fmt.Sprintf("Bearer %s", f.accessToken)).
-		NewRequest("POST", "/k8scollector").
+		NewRequest("PUT", fmt.Sprintf("/integrations/k8s/%s", f.clusterID)).
 		CompressWith(requests.CompressionAlgorithmGzip).
 		ExpectedStatus(http.StatusNoContent).
 		JSONBody(CollectorData{
-			ClusterID: f.clusterID,
-			Objects:   objects,
+			Objects: objects,
 		}).
 		Run()
 }
