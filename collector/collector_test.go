@@ -13,6 +13,8 @@ import (
 	"testing"
 	"testing/fstest"
 
+	"github.com/infralight/k8s-collector/collector/config"
+	"github.com/infralight/k8s-collector/collector/k8s"
 	"github.com/jgroeneveld/trial/assert"
 	"github.com/rs/zerolog"
 	v1 "k8s.io/api/core/v1"
@@ -62,6 +64,13 @@ func TestRun(t *testing.T) {
 			// we generate, and only return 204 No Content if the data matches
 			// the test's expectations
 			ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				if r.Method == http.MethodPost && r.URL.Path == "/account/access_keys/login" {
+					w.Header().Set("Content-Type", "application/json")
+					w.WriteHeader(http.StatusOK)
+					w.Write([]byte(`{"access_token":"token"}`))
+					return
+				}
+
 				// read the data we've received and decode it into an array
 				// of Kubernetes objects
 				reader := r.Body
@@ -84,7 +93,7 @@ func TestRun(t *testing.T) {
 								Namespace string `json:"namespace"`
 							} `json:"metadata"`
 						} `json:"object"`
-					}
+					} `json:"k8s_objects"`
 				}
 				err := json.NewDecoder(reader).Decode(&data)
 				if err != nil {
@@ -111,30 +120,22 @@ func TestRun(t *testing.T) {
 
 			defer ts.Close()
 
-			// Create a fake Kubernetes client
-			client := fake.NewSimpleClientset(test.objs...)
-
-			// create a collector instance
-			f := NewCollector("test", &logger, client)
-
-			// Create an in-memory filesystem for configuration files
-			// create a collector instance
-			f.SetFS(&fstest.MapFS{
+			// Load configuration
+			os.Setenv(config.AccessKeyEnvVar, "bla")
+			os.Setenv(config.SecretKeyEnvVar, "bla")
+			conf, err := config.LoadConfig(&logger, &fstest.MapFS{
 				"etc/config/endpoint":                       &fstest.MapFile{Data: []byte(ts.URL)},
 				"etc/config/collector.resources.configMaps": &fstest.MapFile{Data: []byte("false")},
-			})
-
-			os.Setenv(AccessKeyEnvVar, "bla")
-			os.Setenv(SecretKeyEnvVar, "bla")
-			err := f.loadConfig()
+			}, "")
 			if err != nil {
-				t.Fatalf("Failed configuring collector: %s", err)
+				t.Fatalf("Unexpectedly failed loading configuration: %s", err)
 			}
 
-			// run the collector
-			objects := f.collect(context.Background())
+			// Load the Kubernetes collector with a fake K8s client
+			k8sCollector := k8s.New(fake.NewSimpleClientset(test.objs...))
 
-			err = f.send(objects)
+			// create and run the collector
+			err = New("test", conf, k8sCollector).Run(context.Background())
 			if test.expErr {
 				assert.MustNotBeNil(t, err, "error must not be nil")
 			} else {

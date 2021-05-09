@@ -1,4 +1,4 @@
-package collector
+package config
 
 import (
 	"errors"
@@ -8,7 +8,6 @@ import (
 
 	"github.com/jgroeneveld/trial/assert"
 	"github.com/rs/zerolog"
-	"k8s.io/client-go/kubernetes/fake"
 )
 
 func Test_loadConfig(t *testing.T) {
@@ -21,7 +20,7 @@ func Test_loadConfig(t *testing.T) {
 		secretKey string
 		etcFiles  *fstest.MapFS
 		expErr    error
-		expConfig CollectorConfig
+		expConfig Config
 	}{
 		{
 			name:   "no secret",
@@ -40,7 +39,9 @@ func Test_loadConfig(t *testing.T) {
 			etcFiles: &fstest.MapFS{
 				"etc/config/endpoint": &fstest.MapFile{Data: []byte("http://localhost:5000/api\n")},
 			},
-			expConfig: CollectorConfig{
+			expConfig: Config{
+				Log:                         &logger,
+				ConfigDir:                   DefaultConfigDir,
 				AccessKey:                   "access",
 				SecretKey:                   "secret",
 				Endpoint:                    "http://localhost:5000/api",
@@ -76,7 +77,9 @@ func Test_loadConfig(t *testing.T) {
 				"etc/config/collector.resources.secrets":     &fstest.MapFile{Data: []byte("\ntrue   \n")},
 				"etc/config/collector.resources.deployments": &fstest.MapFile{Data: []byte("false\n")},
 			},
-			expConfig: CollectorConfig{
+			expConfig: Config{
+				Log:                         &logger,
+				ConfigDir:                   DefaultConfigDir,
 				AccessKey:                   "access",
 				SecretKey:                   "secret",
 				Endpoint:                    "http://localhost:5000/api",
@@ -107,19 +110,13 @@ func Test_loadConfig(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			// Create a fake Kubernetes client
-			client := fake.NewSimpleClientset()
-
 			// Create an in-memory filesystem for configuration files
 			memFs := test.etcFiles
 			if memFs == nil {
 				memFs = &fstest.MapFS{}
 			}
 
-			// create a collector instance
-			f := NewCollector("test", &logger, client)
-			f.SetFS(memFs)
-
+			// Set environment variables
 			if test.accessKey != "" {
 				os.Setenv(AccessKeyEnvVar, test.accessKey)
 				os.Setenv(SecretKeyEnvVar, test.secretKey)
@@ -128,13 +125,15 @@ func Test_loadConfig(t *testing.T) {
 				os.Unsetenv(SecretKeyEnvVar)
 			}
 
-			err := f.loadConfig()
+			// Load collector configuration
+			conf, err := LoadConfig(&logger, memFs, "")
 			if test.expErr != nil {
 				assert.MustNotBeNil(t, err, "error must not be nil")
 				assert.True(t, errors.Is(err, test.expErr), "error must match")
 			} else {
 				assert.MustBeNil(t, err, "error must be nil")
-				assert.DeepEqual(t, test.expConfig, *f.config, "config must match")
+				conf.FS = nil
+				assert.DeepEqual(t, test.expConfig, *conf, "config must match")
 			}
 		})
 	}

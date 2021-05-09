@@ -1,12 +1,13 @@
-package collector
+package k8s
 
 import (
 	"context"
 
+	"github.com/infralight/k8s-collector/collector/config"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-func (f *Collector) getNamespaces(ctx context.Context) (
+func (f *Collector) getNamespaces(ctx context.Context, conf *config.Config) (
 	items []interface{},
 	err error,
 ) {
@@ -16,7 +17,7 @@ func (f *Collector) getNamespaces(ctx context.Context) (
 	}
 
 	for _, item := range list.Items {
-		if f.config.ignoreNamespace(item.Namespace) {
+		if conf.IgnoreNamespace(item.Namespace) {
 			continue
 		}
 
@@ -26,7 +27,7 @@ func (f *Collector) getNamespaces(ctx context.Context) (
 	return items, nil
 }
 
-func (f *Collector) getPods(ctx context.Context) (
+func (f *Collector) getPods(ctx context.Context, conf *config.Config) (
 	items []interface{},
 	err error,
 ) {
@@ -36,7 +37,7 @@ func (f *Collector) getPods(ctx context.Context) (
 	}
 
 	for _, item := range list.Items {
-		if f.config.ignoreNamespace(item.Namespace) {
+		if conf.IgnoreNamespace(item.Namespace) {
 			continue
 		}
 
@@ -46,7 +47,7 @@ func (f *Collector) getPods(ctx context.Context) (
 	return items, nil
 }
 
-func (f *Collector) getEvents(ctx context.Context) (
+func (f *Collector) getEvents(ctx context.Context, conf *config.Config) (
 	items []interface{},
 	err error,
 ) {
@@ -56,7 +57,7 @@ func (f *Collector) getEvents(ctx context.Context) (
 	}
 
 	for _, item := range list.Items {
-		if f.config.ignoreNamespace(item.Namespace) {
+		if conf.IgnoreNamespace(item.Namespace) {
 			continue
 		}
 
@@ -66,7 +67,7 @@ func (f *Collector) getEvents(ctx context.Context) (
 	return items, nil
 }
 
-func (f *Collector) getConfigMaps(ctx context.Context) (
+func (f *Collector) getConfigMaps(ctx context.Context, conf *config.Config) (
 	items []interface{},
 	err error,
 ) {
@@ -76,7 +77,7 @@ func (f *Collector) getConfigMaps(ctx context.Context) (
 	}
 
 	for _, item := range list.Items {
-		if f.config.ignoreNamespace(item.Namespace) {
+		if conf.IgnoreNamespace(item.Namespace) {
 			continue
 		}
 
@@ -86,7 +87,7 @@ func (f *Collector) getConfigMaps(ctx context.Context) (
 	return items, nil
 }
 
-func (f *Collector) getReplicationControllers(ctx context.Context) (
+func (f *Collector) getReplicationControllers(ctx context.Context, conf *config.Config) (
 	items []interface{},
 	err error,
 ) {
@@ -96,7 +97,7 @@ func (f *Collector) getReplicationControllers(ctx context.Context) (
 	}
 
 	for _, item := range list.Items {
-		if f.config.ignoreNamespace(item.Namespace) {
+		if conf.IgnoreNamespace(item.Namespace) {
 			continue
 		}
 
@@ -106,7 +107,7 @@ func (f *Collector) getReplicationControllers(ctx context.Context) (
 	return items, nil
 }
 
-func (f *Collector) getNodes(ctx context.Context) (
+func (f *Collector) getNodes(ctx context.Context, conf *config.Config) (
 	items []interface{},
 	err error,
 ) {
@@ -116,7 +117,7 @@ func (f *Collector) getNodes(ctx context.Context) (
 	}
 
 	for _, item := range list.Items {
-		if f.config.ignoreNamespace(item.Namespace) {
+		if conf.IgnoreNamespace(item.Namespace) {
 			continue
 		}
 
@@ -126,7 +127,7 @@ func (f *Collector) getNodes(ctx context.Context) (
 	return items, nil
 }
 
-func (f *Collector) getServices(ctx context.Context) (
+func (f *Collector) getServices(ctx context.Context, conf *config.Config) (
 	items []interface{},
 	err error,
 ) {
@@ -136,7 +137,7 @@ func (f *Collector) getServices(ctx context.Context) (
 	}
 
 	for _, item := range list.Items {
-		if f.config.ignoreNamespace(item.Namespace) {
+		if conf.IgnoreNamespace(item.Namespace) {
 			continue
 		}
 
@@ -146,7 +147,7 @@ func (f *Collector) getServices(ctx context.Context) (
 	return items, nil
 }
 
-func (f *Collector) getServiceAccounts(ctx context.Context) (
+func (f *Collector) getServiceAccounts(ctx context.Context, conf *config.Config) (
 	items []interface{},
 	err error,
 ) {
@@ -156,7 +157,7 @@ func (f *Collector) getServiceAccounts(ctx context.Context) (
 	}
 
 	for _, item := range list.Items {
-		if f.config.ignoreNamespace(item.Namespace) {
+		if conf.IgnoreNamespace(item.Namespace) {
 			continue
 		}
 
@@ -166,7 +167,7 @@ func (f *Collector) getServiceAccounts(ctx context.Context) (
 	return items, nil
 }
 
-func (f *Collector) getPersistentVolumes(ctx context.Context) (
+func (f *Collector) getPersistentVolumes(ctx context.Context, conf *config.Config) (
 	items []interface{},
 	err error,
 ) {
@@ -176,7 +177,7 @@ func (f *Collector) getPersistentVolumes(ctx context.Context) (
 	}
 
 	for _, item := range list.Items {
-		if f.config.ignoreNamespace(item.Namespace) {
+		if conf.IgnoreNamespace(item.Namespace) {
 			continue
 		}
 
@@ -186,7 +187,7 @@ func (f *Collector) getPersistentVolumes(ctx context.Context) (
 	return items, nil
 }
 
-func (f *Collector) getPersistentVolumeClaims(ctx context.Context) (
+func (f *Collector) getPersistentVolumeClaims(ctx context.Context, conf *config.Config) (
 	items []interface{},
 	err error,
 ) {
@@ -196,7 +197,7 @@ func (f *Collector) getPersistentVolumeClaims(ctx context.Context) (
 	}
 
 	for _, item := range list.Items {
-		if f.config.ignoreNamespace(item.Namespace) {
+		if conf.IgnoreNamespace(item.Namespace) {
 			continue
 		}
 
@@ -206,7 +207,7 @@ func (f *Collector) getPersistentVolumeClaims(ctx context.Context) (
 	return items, nil
 }
 
-func (f *Collector) getSecrets(ctx context.Context) (
+func (f *Collector) getSecrets(ctx context.Context, conf *config.Config) (
 	items []interface{},
 	err error,
 ) {
@@ -216,7 +217,7 @@ func (f *Collector) getSecrets(ctx context.Context) (
 	}
 
 	for _, item := range list.Items {
-		if f.config.ignoreNamespace(item.Namespace) {
+		if conf.IgnoreNamespace(item.Namespace) {
 			continue
 		}
 
@@ -226,7 +227,7 @@ func (f *Collector) getSecrets(ctx context.Context) (
 	return items, nil
 }
 
-func (f *Collector) getDeployments(ctx context.Context) (
+func (f *Collector) getDeployments(ctx context.Context, conf *config.Config) (
 	items []interface{},
 	err error,
 ) {
@@ -236,7 +237,7 @@ func (f *Collector) getDeployments(ctx context.Context) (
 	}
 
 	for _, item := range list.Items {
-		if f.config.ignoreNamespace(item.Namespace) {
+		if conf.IgnoreNamespace(item.Namespace) {
 			continue
 		}
 
@@ -246,7 +247,7 @@ func (f *Collector) getDeployments(ctx context.Context) (
 	return items, nil
 }
 
-func (f *Collector) getDaemonSets(ctx context.Context) (
+func (f *Collector) getDaemonSets(ctx context.Context, conf *config.Config) (
 	items []interface{},
 	err error,
 ) {
@@ -256,7 +257,7 @@ func (f *Collector) getDaemonSets(ctx context.Context) (
 	}
 
 	for _, item := range list.Items {
-		if f.config.ignoreNamespace(item.Namespace) {
+		if conf.IgnoreNamespace(item.Namespace) {
 			continue
 		}
 
@@ -266,7 +267,7 @@ func (f *Collector) getDaemonSets(ctx context.Context) (
 	return items, nil
 }
 
-func (f *Collector) getReplicaSets(ctx context.Context) (
+func (f *Collector) getReplicaSets(ctx context.Context, conf *config.Config) (
 	items []interface{},
 	err error,
 ) {
@@ -276,7 +277,7 @@ func (f *Collector) getReplicaSets(ctx context.Context) (
 	}
 
 	for _, item := range list.Items {
-		if f.config.ignoreNamespace(item.Namespace) {
+		if conf.IgnoreNamespace(item.Namespace) {
 			continue
 		}
 
@@ -286,7 +287,7 @@ func (f *Collector) getReplicaSets(ctx context.Context) (
 	return items, nil
 }
 
-func (f *Collector) getStatefulSet(ctx context.Context) (
+func (f *Collector) getStatefulSet(ctx context.Context, conf *config.Config) (
 	items []interface{},
 	err error,
 ) {
@@ -296,7 +297,7 @@ func (f *Collector) getStatefulSet(ctx context.Context) (
 	}
 
 	for _, item := range list.Items {
-		if f.config.ignoreNamespace(item.Namespace) {
+		if conf.IgnoreNamespace(item.Namespace) {
 			continue
 		}
 
@@ -306,7 +307,7 @@ func (f *Collector) getStatefulSet(ctx context.Context) (
 	return items, nil
 }
 
-func (f *Collector) getJobs(ctx context.Context) (
+func (f *Collector) getJobs(ctx context.Context, conf *config.Config) (
 	items []interface{},
 	err error,
 ) {
@@ -316,7 +317,7 @@ func (f *Collector) getJobs(ctx context.Context) (
 	}
 
 	for _, item := range list.Items {
-		if f.config.ignoreNamespace(item.Namespace) {
+		if conf.IgnoreNamespace(item.Namespace) {
 			continue
 		}
 
@@ -326,7 +327,7 @@ func (f *Collector) getJobs(ctx context.Context) (
 	return items, nil
 }
 
-func (f *Collector) getCronJobs(ctx context.Context) (
+func (f *Collector) getCronJobs(ctx context.Context, conf *config.Config) (
 	items []interface{},
 	err error,
 ) {
@@ -336,7 +337,7 @@ func (f *Collector) getCronJobs(ctx context.Context) (
 	}
 
 	for _, item := range list.Items {
-		if f.config.ignoreNamespace(item.Namespace) {
+		if conf.IgnoreNamespace(item.Namespace) {
 			continue
 		}
 
@@ -346,7 +347,7 @@ func (f *Collector) getCronJobs(ctx context.Context) (
 	return items, nil
 }
 
-func (f *Collector) getIngresses(ctx context.Context) (
+func (f *Collector) getIngresses(ctx context.Context, conf *config.Config) (
 	items []interface{},
 	err error,
 ) {
@@ -356,7 +357,7 @@ func (f *Collector) getIngresses(ctx context.Context) (
 	}
 
 	for _, item := range list.Items {
-		if f.config.ignoreNamespace(item.Namespace) {
+		if conf.IgnoreNamespace(item.Namespace) {
 			continue
 		}
 
@@ -366,7 +367,7 @@ func (f *Collector) getIngresses(ctx context.Context) (
 	return items, nil
 }
 
-func (f *Collector) getClusterRoles(ctx context.Context) (
+func (f *Collector) getClusterRoles(ctx context.Context, conf *config.Config) (
 	items []interface{},
 	err error,
 ) {
@@ -376,7 +377,7 @@ func (f *Collector) getClusterRoles(ctx context.Context) (
 	}
 
 	for _, item := range list.Items {
-		if f.config.ignoreNamespace(item.Namespace) {
+		if conf.IgnoreNamespace(item.Namespace) {
 			continue
 		}
 
