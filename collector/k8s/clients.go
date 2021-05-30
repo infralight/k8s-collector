@@ -11,6 +11,7 @@ func (f *Collector) getNamespaces(ctx context.Context, conf *config.Config) (
 	items []interface{},
 	err error,
 ) {
+	version := f.api.CoreV1().RESTClient().APIVersion().String()
 	list, err := f.api.CoreV1().Namespaces().List(ctx, metav1.ListOptions{})
 	if err != nil {
 		return items, err
@@ -21,6 +22,7 @@ func (f *Collector) getNamespaces(ctx context.Context, conf *config.Config) (
 			continue
 		}
 
+		item.APIVersion = version
 		items = append(items, item)
 	}
 
@@ -31,6 +33,7 @@ func (f *Collector) getPods(ctx context.Context, conf *config.Config) (
 	items []interface{},
 	err error,
 ) {
+	version := f.api.CoreV1().RESTClient().APIVersion().String()
 	list, err := f.api.CoreV1().Pods("").List(ctx, metav1.ListOptions{})
 	if err != nil {
 		return items, err
@@ -41,6 +44,7 @@ func (f *Collector) getPods(ctx context.Context, conf *config.Config) (
 			continue
 		}
 
+		item.APIVersion = version
 		items = append(items, item)
 	}
 
@@ -51,6 +55,7 @@ func (f *Collector) getEvents(ctx context.Context, conf *config.Config) (
 	items []interface{},
 	err error,
 ) {
+	version := f.api.CoreV1().RESTClient().APIVersion().String()
 	list, err := f.api.CoreV1().Events("").List(ctx, metav1.ListOptions{})
 	if err != nil {
 		return items, err
@@ -61,6 +66,7 @@ func (f *Collector) getEvents(ctx context.Context, conf *config.Config) (
 			continue
 		}
 
+		item.APIVersion = version
 		items = append(items, item)
 	}
 
@@ -71,6 +77,7 @@ func (f *Collector) getConfigMaps(ctx context.Context, conf *config.Config) (
 	items []interface{},
 	err error,
 ) {
+	version := f.api.CoreV1().RESTClient().APIVersion().String()
 	list, err := f.api.CoreV1().ConfigMaps("").List(ctx, metav1.ListOptions{})
 	if err != nil {
 		return items, err
@@ -81,6 +88,7 @@ func (f *Collector) getConfigMaps(ctx context.Context, conf *config.Config) (
 			continue
 		}
 
+		item.APIVersion = version
 		items = append(items, item)
 	}
 
@@ -91,6 +99,7 @@ func (f *Collector) getReplicationControllers(ctx context.Context, conf *config.
 	items []interface{},
 	err error,
 ) {
+	version := f.api.CoreV1().RESTClient().APIVersion().String()
 	list, err := f.api.CoreV1().ReplicationControllers("").List(ctx, metav1.ListOptions{})
 	if err != nil {
 		return items, err
@@ -101,6 +110,7 @@ func (f *Collector) getReplicationControllers(ctx context.Context, conf *config.
 			continue
 		}
 
+		item.APIVersion = version
 		items = append(items, item)
 	}
 
@@ -111,6 +121,7 @@ func (f *Collector) getNodes(ctx context.Context, conf *config.Config) (
 	items []interface{},
 	err error,
 ) {
+	version := f.api.CoreV1().RESTClient().APIVersion().String()
 	list, err := f.api.CoreV1().Nodes().List(ctx, metav1.ListOptions{})
 	if err != nil {
 		return items, err
@@ -121,6 +132,7 @@ func (f *Collector) getNodes(ctx context.Context, conf *config.Config) (
 			continue
 		}
 
+		item.APIVersion = version
 		items = append(items, item)
 	}
 
@@ -131,6 +143,7 @@ func (f *Collector) getServices(ctx context.Context, conf *config.Config) (
 	items []interface{},
 	err error,
 ) {
+	version := f.api.CoreV1().RESTClient().APIVersion().String()
 	list, err := f.api.CoreV1().Services("").List(ctx, metav1.ListOptions{})
 	if err != nil {
 		return items, err
@@ -141,6 +154,7 @@ func (f *Collector) getServices(ctx context.Context, conf *config.Config) (
 			continue
 		}
 
+		item.APIVersion = version
 		items = append(items, item)
 	}
 
@@ -151,6 +165,7 @@ func (f *Collector) getServiceAccounts(ctx context.Context, conf *config.Config)
 	items []interface{},
 	err error,
 ) {
+	version := f.api.CoreV1().RESTClient().APIVersion().String()
 	list, err := f.api.CoreV1().ServiceAccounts("").List(ctx, metav1.ListOptions{})
 	if err != nil {
 		return items, err
@@ -161,6 +176,7 @@ func (f *Collector) getServiceAccounts(ctx context.Context, conf *config.Config)
 			continue
 		}
 
+		item.APIVersion = version
 		items = append(items, item)
 	}
 
@@ -171,6 +187,7 @@ func (f *Collector) getPersistentVolumes(ctx context.Context, conf *config.Confi
 	items []interface{},
 	err error,
 ) {
+	version := f.api.CoreV1().RESTClient().APIVersion().String()
 	list, err := f.api.CoreV1().PersistentVolumes().List(ctx, metav1.ListOptions{})
 	if err != nil {
 		return items, err
@@ -181,6 +198,7 @@ func (f *Collector) getPersistentVolumes(ctx context.Context, conf *config.Confi
 			continue
 		}
 
+		item.APIVersion = version
 		items = append(items, item)
 	}
 
@@ -191,6 +209,7 @@ func (f *Collector) getPersistentVolumeClaims(ctx context.Context, conf *config.
 	items []interface{},
 	err error,
 ) {
+	version := f.api.CoreV1().RESTClient().APIVersion().String()
 	list, err := f.api.CoreV1().PersistentVolumeClaims("").List(ctx, metav1.ListOptions{})
 	if err != nil {
 		return items, err
@@ -201,6 +220,7 @@ func (f *Collector) getPersistentVolumeClaims(ctx context.Context, conf *config.
 			continue
 		}
 
+		item.APIVersion = version
 		items = append(items, item)
 	}
 
@@ -211,6 +231,7 @@ func (f *Collector) getSecrets(ctx context.Context, conf *config.Config) (
 	items []interface{},
 	err error,
 ) {
+	version := f.api.CoreV1().RESTClient().APIVersion().String()
 	list, err := f.api.CoreV1().Secrets("").List(ctx, metav1.ListOptions{})
 	if err != nil {
 		return items, err
@@ -221,6 +242,7 @@ func (f *Collector) getSecrets(ctx context.Context, conf *config.Config) (
 			continue
 		}
 
+		item.APIVersion = version
 		items = append(items, item)
 	}
 
@@ -231,6 +253,7 @@ func (f *Collector) getDeployments(ctx context.Context, conf *config.Config) (
 	items []interface{},
 	err error,
 ) {
+	version := f.api.AppsV1().RESTClient().APIVersion().String()
 	list, err := f.api.AppsV1().Deployments("").List(ctx, metav1.ListOptions{})
 	if err != nil {
 		return items, err
@@ -241,6 +264,7 @@ func (f *Collector) getDeployments(ctx context.Context, conf *config.Config) (
 			continue
 		}
 
+		item.APIVersion = version
 		items = append(items, item)
 	}
 
@@ -251,6 +275,7 @@ func (f *Collector) getDaemonSets(ctx context.Context, conf *config.Config) (
 	items []interface{},
 	err error,
 ) {
+	version := f.api.AppsV1().RESTClient().APIVersion().String()
 	list, err := f.api.AppsV1().DaemonSets("").List(ctx, metav1.ListOptions{})
 	if err != nil {
 		return items, err
@@ -261,6 +286,7 @@ func (f *Collector) getDaemonSets(ctx context.Context, conf *config.Config) (
 			continue
 		}
 
+		item.APIVersion = version
 		items = append(items, item)
 	}
 
@@ -271,6 +297,7 @@ func (f *Collector) getReplicaSets(ctx context.Context, conf *config.Config) (
 	items []interface{},
 	err error,
 ) {
+	version := f.api.AppsV1().RESTClient().APIVersion().String()
 	list, err := f.api.AppsV1().ReplicaSets("").List(ctx, metav1.ListOptions{})
 	if err != nil {
 		return items, err
@@ -281,6 +308,7 @@ func (f *Collector) getReplicaSets(ctx context.Context, conf *config.Config) (
 			continue
 		}
 
+		item.APIVersion = version
 		items = append(items, item)
 	}
 
@@ -291,6 +319,7 @@ func (f *Collector) getStatefulSet(ctx context.Context, conf *config.Config) (
 	items []interface{},
 	err error,
 ) {
+	version := f.api.AppsV1().RESTClient().APIVersion().String()
 	list, err := f.api.AppsV1().StatefulSets("").List(ctx, metav1.ListOptions{})
 	if err != nil {
 		return items, err
@@ -301,6 +330,7 @@ func (f *Collector) getStatefulSet(ctx context.Context, conf *config.Config) (
 			continue
 		}
 
+		item.APIVersion = version
 		items = append(items, item)
 	}
 
@@ -311,6 +341,7 @@ func (f *Collector) getJobs(ctx context.Context, conf *config.Config) (
 	items []interface{},
 	err error,
 ) {
+	version := f.api.BatchV1().RESTClient().APIVersion().String()
 	list, err := f.api.BatchV1().Jobs("").List(ctx, metav1.ListOptions{})
 	if err != nil {
 		return items, err
@@ -321,6 +352,7 @@ func (f *Collector) getJobs(ctx context.Context, conf *config.Config) (
 			continue
 		}
 
+		item.APIVersion = version
 		items = append(items, item)
 	}
 
@@ -331,6 +363,7 @@ func (f *Collector) getCronJobs(ctx context.Context, conf *config.Config) (
 	items []interface{},
 	err error,
 ) {
+	version := f.api.BatchV1beta1().RESTClient().APIVersion().String()
 	list, err := f.api.BatchV1beta1().CronJobs("").List(ctx, metav1.ListOptions{})
 	if err != nil {
 		return items, err
@@ -340,7 +373,7 @@ func (f *Collector) getCronJobs(ctx context.Context, conf *config.Config) (
 		if conf.IgnoreNamespace(item.Namespace) {
 			continue
 		}
-
+		item.APIVersion = version
 		items = append(items, item)
 	}
 
@@ -351,6 +384,7 @@ func (f *Collector) getIngresses(ctx context.Context, conf *config.Config) (
 	items []interface{},
 	err error,
 ) {
+	version := f.api.NetworkingV1().RESTClient().APIVersion().String()
 	list, err := f.api.NetworkingV1().Ingresses("").List(ctx, metav1.ListOptions{})
 	if err != nil {
 		return items, err
@@ -361,6 +395,7 @@ func (f *Collector) getIngresses(ctx context.Context, conf *config.Config) (
 			continue
 		}
 
+		item.APIVersion = version
 		items = append(items, item)
 	}
 
@@ -371,6 +406,7 @@ func (f *Collector) getClusterRoles(ctx context.Context, conf *config.Config) (
 	items []interface{},
 	err error,
 ) {
+	version := f.api.RbacV1().RESTClient().APIVersion().String()
 	list, err := f.api.RbacV1().ClusterRoles().List(ctx, metav1.ListOptions{})
 	if err != nil {
 		return items, err
@@ -381,6 +417,7 @@ func (f *Collector) getClusterRoles(ctx context.Context, conf *config.Config) (
 			continue
 		}
 
+		item.APIVersion = version
 		items = append(items, item)
 	}
 

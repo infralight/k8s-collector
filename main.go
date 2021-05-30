@@ -51,13 +51,12 @@ func main() {
 			Msg("Failed loading Kubernetes collector")
 	}
 
-	// Optionally load the Helm collector
+	// Load the Helm collector
 	helmCollector, err := helm.DefaultConfiguration(logger.Printf)
 	if err != nil {
-		// just log, do not fail
-		logger.Warn().
+		logger.Fatal().
 			Err(err).
-			Msg("Failed loading Helm collector, will continue anyway")
+			Msg("Failed loading Helm collector")
 	}
 
 	err = collector.
