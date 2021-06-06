@@ -163,7 +163,7 @@ func LoadConfig(
 	conf.FetchPersistentVolumes = parseBool(conf.etcConfig("collector.resources.persistentVolumes"), true)
 	conf.FetchPersistentVolumeClaims = parseBool(conf.etcConfig("collector.resources.persistentVolumeClaims"), true)
 	conf.FetchNamespaces = parseBool(conf.etcConfig("collector.resources.namespaces"), true)
-	conf.FetchConfigMaps = parseBool(conf.etcConfig("collector.resources.confMaps"), true)
+	conf.FetchConfigMaps = parseBool(conf.etcConfig("collector.resources.configMaps"), true)
 	conf.FetchSecrets = parseBool(conf.etcConfig("collector.resources.secrets"), false)
 	conf.FetchDeployments = parseBool(conf.etcConfig("collector.resources.deployments"), true)
 	conf.FetchDaemonSets = parseBool(conf.etcConfig("collector.resources.daemonSets"), true)

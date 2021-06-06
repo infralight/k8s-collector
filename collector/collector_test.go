@@ -50,6 +50,13 @@ func TestRun(t *testing.T) {
 						Namespace: "default",
 					},
 				},
+				&v1.ConfigMap{
+					TypeMeta: metav1.TypeMeta{Kind: "ConfigMap"},
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "fake-configmap",
+						Namespace: "default",
+					},
+				},
 			},
 			expObjects: []string{
 				"Pod:default:fake-pod",
@@ -104,6 +111,10 @@ func TestRun(t *testing.T) {
 				// convert the objects to a list of strings
 				objs := make([]string, len(data.Objects))
 				for i, obj := range data.Objects {
+					if obj.Kind == "ConfigMap" {
+						// Should be filtered by Conf
+						t.Error("ConfigMap should be filtered")
+					}
 					objs[i] = fmt.Sprintf("%s:%s:%s", obj.Kind, obj.Object.Metadata.Namespace, obj.Object.Metadata.Name)
 				}
 
