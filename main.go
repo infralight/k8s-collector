@@ -10,8 +10,7 @@ import (
 	"github.com/infralight/k8s-collector/collector/helm"
 	"github.com/infralight/k8s-collector/collector/k8s"
 	"github.com/infralight/k8s-collector/collector/k8stypes"
-	"github.com/rs/zerolog"
-	"github.com/rs/zerolog/log"
+	Logger "github.com/infralight/logger"
 	_ "k8s.io/client-go/plugin/pkg/client/auth"
 )
 
@@ -21,9 +20,13 @@ func main() {
 	external := flag.String("external", "", "run outside of the cluster (provide path to kubeconfig file)")
 	configDir := flag.String("config", "/etc/config", "configuration files directory")
 	flag.Parse()
+	if *debug {
+		_ = os.Setenv("INFRALIGHT_ENV", "development")
+	}
 
 	// Initiate a logger
-	logger := loadLogger(*debug)
+	logger := Logger.New()
+	defer logger.Flush()
 
 	// Get cluster ID from command line arguments or environment variable.
 	// The cluster ID is required.
@@ -77,19 +80,4 @@ func main() {
 	}
 
 	logger.Info().Msg("Fetcher successfully finished")
-}
-
-func loadLogger(debug bool) *zerolog.Logger {
-	// When running in debug mode, enable pretty-printed logging with minimum
-	// log level set at DEBUG. In non-debug mode, use standard JSON logging with
-	// unix timestamp for better performance
-	if debug {
-		log.Logger = log.Output(zerolog.ConsoleWriter{Out: os.Stderr})
-		zerolog.SetGlobalLevel(zerolog.DebugLevel)
-	} else {
-		zerolog.SetGlobalLevel(zerolog.InfoLevel)
-		zerolog.TimeFieldFormat = zerolog.TimeFormatUnix
-	}
-
-	return &log.Logger
 }

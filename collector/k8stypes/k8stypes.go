@@ -3,7 +3,9 @@ package k8stypes
 import (
 	"context"
 	"fmt"
+
 	"github.com/infralight/k8s-collector/collector/config"
+	"github.com/rs/zerolog/log"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
@@ -79,6 +81,7 @@ func (f *Collector) Run(ctx context.Context, conf *config.Config) (
 	}
 	for _, apiGroup := range apiGroups {
 		if len(apiGroup.APIResources) == 0 {
+			log.Warn().Str("api_group", apiGroup.GroupVersion).Msg("ApiGroup has no available resources")
 			continue
 		}
 		for _, resource := range apiGroup.APIResources {

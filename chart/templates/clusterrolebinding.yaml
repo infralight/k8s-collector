@@ -3,9 +3,9 @@ kind: ClusterRoleBinding
 metadata:
   name: {{ .Values.clusterRole.name }}-binding
 subjects:
-- kind: User
-  name: manager
-  apiGroup: rbac.authorization.k8s.io
+  - kind: ServiceAccount
+    name: {{ .Values.serviceAccount.name }}
+    namesapce: {{ .Release.Namespace }}
 roleRef:
   kind: ClusterRole
   name: {{ .Values.clusterRole.name }}
