@@ -8,7 +8,7 @@ import (
 	"strconv"
 	"strings"
 
-	Logger "github.com/infralight/logger"
+	"github.com/rs/zerolog"
 )
 
 const (
@@ -50,7 +50,7 @@ type Config struct {
 	ConfigDir string
 
 	// The logger instance
-	Log *Logger.Logger
+	Log *zerolog.Logger
 
 	// AccessKey is the Infralight access key
 	AccessKey string
@@ -115,13 +115,13 @@ type Config struct {
 // a noop logger is used, the local file system is used, and DefaultConfigDir is
 // used.
 func LoadConfig(
-	log *Logger.Logger,
+	log *zerolog.Logger,
 	cfs fs.FS,
 	configDir string,
 ) (conf *Config, err error) {
 	if log == nil {
-		l := Logger.New()
-		log = l
+		l := zerolog.Nop()
+		log = &l
 	}
 	if cfs == nil {
 		log.Debug().Msg("No file system object provided, using default one")

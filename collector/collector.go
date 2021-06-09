@@ -123,6 +123,10 @@ func (f *Collector) authenticate() (accessToken string, err error) {
 }
 
 func (f *Collector) send(data map[string]interface{}) error {
+	f.conf.Log.Debug().
+		Interface("data", data).
+		Msg("Sending collected data to Infralight")
+
 	return requests.NewClient(f.conf.Endpoint).
 		Header("Authorization", fmt.Sprintf("Bearer %s", f.accessToken)).
 		NewRequest("PUT", fmt.Sprintf("/integrations/k8s/%s", f.clusterID)).
