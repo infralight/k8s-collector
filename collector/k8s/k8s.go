@@ -4,10 +4,12 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/infralight/k8s-collector/collector/config"
+	"github.com/rs/zerolog/log"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
+
+	"github.com/infralight/k8s-collector/collector/config"
 )
 
 // Collector is a struct implementing the DataCollector interface. It wraps a
@@ -84,6 +86,7 @@ func (f *Collector) Run(ctx context.Context, conf *config.Config) (
 	objects []interface{},
 	err error,
 ) {
+	log.Debug().Msg("Starting collect Kubernetes objects")
 	var numFailed int
 	var lastErr error
 
@@ -142,6 +145,8 @@ func (f *Collector) Run(ctx context.Context, conf *config.Config) (
 	if numFailed == len(funcs) {
 		return "k8s_objects", objects, lastErr
 	}
+
+	log.Info().Int("amount", len(objects)).Msg("Finished collecting Kubernetes objects")
 
 	return "k8s_objects", objects, nil
 }

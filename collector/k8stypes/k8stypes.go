@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/rs/zerolog/log"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
@@ -72,7 +73,7 @@ func (f *Collector) Run(ctx context.Context, conf *config.Config) (
 	types []interface{},
 	err error,
 ) {
-
+	log.Debug().Msg("Starting collect Kubernetes supported types")
 	var supportedResources []map[string]interface{}
 
 	apiGroups, err := f.api.Discovery().ServerPreferredResources()
@@ -96,6 +97,8 @@ func (f *Collector) Run(ctx context.Context, conf *config.Config) (
 	for i, rel := range supportedResources {
 		types[i] = rel
 	}
+
+	log.Info().Int("amount", len(supportedResources)).Msg("Finished collecting Kubernetes supported types")
 
 	return "k8s_types", types, nil
 }
