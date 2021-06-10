@@ -3,10 +3,12 @@ package k8stypes
 import (
 	"context"
 	"fmt"
-	"github.com/infralight/k8s-collector/collector/config"
+
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
+
+	"github.com/infralight/k8s-collector/collector/config"
 )
 
 // Collector is a struct implementing the DataCollector interface. It wraps a
