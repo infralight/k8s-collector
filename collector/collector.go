@@ -3,22 +3,33 @@ package collector
 import (
 	"context"
 	"fmt"
-	"io/fs"
 	"net/http"
-	"os"
 	"regexp"
 
 	"github.com/ido50/requests"
-	"github.com/rs/zerolog"
-	"k8s.io/client-go/kubernetes"
+	"github.com/infralight/k8s-collector/collector/config"
 )
 
+// DataCollector is an interface for objects that collect data from K8s-related
+// components such as the Kubernetes API Server or Helm
+type DataCollector interface {
+	// Source is a method that returns a unique name for the collector source
+	Source() string
+
+	// Run executes the data collector. The configuration object is always passed
+	// and is never empty or nil. Every collector must return a name for the
+	// key under which the data will be sent to the Infralight App Server, the
+	// data itself (which is a list of arbitrary objects), and an optional error.
+	Run(context.Context, *config.Config) (
+		keyName string,
+		data []interface{},
+		err error,
+	)
+}
+
+// Collector is an execution-scoped object encapsulating the entire collection
+// process.
 type Collector struct {
-	log *zerolog.Logger
-
-	// client object for the Kubernetes API server
-	api kubernetes.Interface
-
 	// the JWT access token used to authenticate with the Infralight App server.
 	// this is automatically generated
 	accessToken string
@@ -27,79 +38,46 @@ type Collector struct {
 	// provided externally)
 	clusterID string
 
-	// file system object from which configuration files are read. by default,
-	// this is the local file system; an in-memory file system is used in the
-	// unit tests
-	fs fs.FS
-
-	// the directory inside fs where configuration files are stored. by default,
-	// this is /etc/config
-	configDir string
-
 	// the collector's configuration
-	config *CollectorConfig
-}
+	conf *config.Config
 
-// K8sObject is a pointless struct type that we have no choice but create due to
-// an issue with how the official Kubernetes client encodes objects to JSON.
-// The "Kind" attribute that each object has is in an embedded struct that is
-// set with the following struct tag: json:",inline". The problem is that the
-// "inline" struct tag is still in proposal status and not supported by Go,
-// (see here: https://github.com/golang/go/issues/6213), and so JSON objects are
-// missing the "kind" attribute. This is just a workaround to ensure we also
-// send the kind.
-type K8sObject struct {
-	Kind   string      `json:"kind"`
-	Object interface{} `json:"object"`
-}
-
-type CollectorData struct {
-	ClusterID string      `json:"cluster_id"`
-	Objects   []K8sObject `json:"objects"`
+	// the data collectors
+	dataCollectors []DataCollector
 }
 
 var clusterIDRegex = regexp.MustCompile(`^[a-z0-9-_]+$`)
 
-func NewCollector(
+// New creates a new instance of the Collector struct. A Kubernetes cluster ID
+// must be provided, together with a configuration object and a list of objects
+// implementing the DataCollector interface.
+//
+// The cluster ID is a string of alphanumeric characters, dashes and underscores,
+// of any length. Spaces are not allowed.
+//
+// A configuration object must be provided.
+func New(
 	clusterID string,
-	log *zerolog.Logger,
-	api kubernetes.Interface,
+	conf *config.Config,
+	dataCollectors ...DataCollector,
 ) *Collector {
+	if conf == nil {
+		panic("Configuration object must be provided")
+	}
+
 	return &Collector{
-		log:       log,
-		api:       api,
-		clusterID: clusterID,
-		fs:        &localFS{},
-		configDir: "/etc/config",
+		conf:           conf,
+		clusterID:      clusterID,
+		dataCollectors: dataCollectors,
 	}
 }
 
-func (f *Collector) SetFS(fs fs.FS) *Collector {
-	f.fs = fs
-	return f
-}
-
-func (f *Collector) SetConfigDir(dir string) *Collector {
-	f.configDir = dir
-	return f
-}
-
-type fetchFunc struct {
-	kind   string
-	fn     func(context.Context) (items []interface{}, err error)
-	onlyIf bool
-}
-
-func (f *Collector) Run(ctx context.Context) error {
+// Run executes the collector. The process includes authentication with the
+// Infralight App Server, execution of all data collectors, and sending of the
+// data to the App Server for storage.
+func (f *Collector) Run(ctx context.Context) (err error) {
 	// verify cluster ID is valid
 	if !clusterIDRegex.MatchString(f.clusterID) {
 		return fmt.Errorf("invalid cluster ID, must match %s", clusterIDRegex)
-	}
-
-	// load our configuration from a ConfigMap
-	err := f.loadConfig()
-	if err != nil {
-		return fmt.Errorf("failed loading configuration map: %w", err)
 	}
 
 	// authenticate with the Infralight API
@@ -108,9 +86,17 @@ func (f *Collector) Run(ctx context.Context) error {
 		return fmt.Errorf("failed authenticating with Infralight API: %w", err)
 	}
 
-	objects := f.collect(ctx)
+	fullData := make(map[string]interface{}, len(f.dataCollectors))
+	for _, dc := range f.dataCollectors {
+		keyName, data, err := dc.Run(ctx, f.conf)
+		if err != nil {
+			return fmt.Errorf("%s collector failed: %w", dc.Source(), err)
+		}
 
-	err = f.send(objects)
+		fullData[keyName] = data
+	}
+
+	err = f.send(fullData)
 	if err != nil {
 		return fmt.Errorf("failed sending objects to Infralight: %w", err)
 	}
@@ -125,81 +111,27 @@ func (f *Collector) authenticate() (accessToken string, err error) {
 		Type      string `json:"token_type"`
 	}
 
-	err = requests.NewClient(f.config.Endpoint).
+	err = requests.NewClient(f.conf.Endpoint).
 		NewRequest("POST", "/account/access_keys/login").
 		JSONBody(map[string]interface{}{
-			"accessKey": f.config.AccessKey,
-			"secretKey": f.config.SecretKey,
+			"accessKey": f.conf.AccessKey,
+			"secretKey": f.conf.SecretKey,
 		}).
 		Into(&credentials).
 		Run()
 	return credentials.Token, err
 }
 
-func (f *Collector) collect(ctx context.Context) (objects []K8sObject) {
-	for _, fn := range []fetchFunc{
-		{"ClusterRole", f.getClusterRoles, f.config.FetchClusterRoles},
-		{"ConfigMap", f.getConfigMaps, f.config.FetchConfigMaps},
-		{"CronJob", f.getCronJobs, f.config.FetchCronJobs},
-		{"Event", f.getEvents, f.config.FetchEvents},
-		{"DaemonSet", f.getDaemonSets, f.config.FetchDaemonSets},
-		{"Deployment", f.getDeployments, f.config.FetchDeployments},
-		{"Ingress", f.getIngresses, f.config.FetchIngresses},
-		{"Job", f.getJobs, f.config.FetchJobs},
-		{"Namespace", f.getNamespaces, f.config.FetchNamespaces},
-		{"Node", f.getNodes, f.config.FetchNodes},
-		{"ReplicaSet", f.getReplicaSets, f.config.FetchReplicaSets},
-		{"ReplicationController", f.getReplicationControllers, f.config.FetchReplicationControllers},
-		{"ServiceAccount", f.getServiceAccounts, f.config.FetchServiceAccounts},
-		{"Service", f.getServices, f.config.FetchServices},
-		{"Secret", f.getSecrets, f.config.FetchSecrets},
-		{"StatefulSet", f.getStatefulSet, f.config.FetchStatefulSets},
-		{"PersistentVolumeClaim", f.getPersistentVolumeClaims, f.config.FetchPersistentVolumeClaims},
-		{"PersistentVolume", f.getPersistentVolumes, f.config.FetchPersistentVolumes},
-		{"Pod", f.getPods, f.config.FetchPods},
-	} {
-		if !fn.onlyIf {
-			continue
-		}
+func (f *Collector) send(data map[string]interface{}) error {
+	f.conf.Log.Debug().
+		Interface("data", data).
+		Msg("Sending collected data to Infralight")
 
-		items, err := fn.fn(ctx)
-		if err != nil {
-			f.log.Warn().
-				Err(err).
-				Str("kind", fn.kind).
-				Msg("Collector function failed")
-			continue
-		}
-
-		if len(items) == 0 {
-			continue
-		}
-
-		for _, item := range items {
-			objects = append(objects, K8sObject{
-				Kind:   fn.kind,
-				Object: item,
-			})
-		}
-	}
-
-	return objects
-}
-
-func (f *Collector) send(objects []K8sObject) error {
-	return requests.NewClient(f.config.Endpoint).
+	return requests.NewClient(f.conf.Endpoint).
 		Header("Authorization", fmt.Sprintf("Bearer %s", f.accessToken)).
 		NewRequest("PUT", fmt.Sprintf("/integrations/k8s/%s", f.clusterID)).
 		CompressWith(requests.CompressionAlgorithmGzip).
 		ExpectedStatus(http.StatusNoContent).
-		JSONBody(CollectorData{
-			Objects: objects,
-		}).
+		JSONBody(data).
 		Run()
-}
-
-type localFS struct{}
-
-func (fs *localFS) Open(name string) (fs.File, error) {
-	return os.Open("/" + name)
 }
