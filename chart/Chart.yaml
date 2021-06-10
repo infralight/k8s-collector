@@ -2,5 +2,5 @@ apiVersion: v2
 name: infralight-k8s-collector
 description: Infralight's Kubernetes Collector
 type: application
-version: 1.0.1
+version: 1.0.0
 appVersion: "1.0.0"
