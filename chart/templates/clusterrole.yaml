@@ -25,9 +25,7 @@ rules:
       - events
       - nodes
       - namespaces
-{{- if .Values.collectSecrets}}
       - secrets
-{{- end }}
   - verbs:
       - list
     apiGroups:
