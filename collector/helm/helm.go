@@ -3,12 +3,13 @@ package helm
 import (
 	"context"
 	"fmt"
-	"log"
 	"os"
 
-	"github.com/infralight/k8s-collector/collector/config"
+	"github.com/rs/zerolog/log"
 	"helm.sh/helm/v3/pkg/action"
 	"helm.sh/helm/v3/pkg/cli"
+
+	"github.com/infralight/k8s-collector/collector/config"
 )
 
 // Collector is a struct implementing the DataCollector interface. It wraps a
@@ -61,6 +62,7 @@ func (c *Collector) Run(ctx context.Context, _ *config.Config) (
 	data []interface{},
 	err error,
 ) {
+	log.Debug().Msg("Starting collect Helm repositories")
 	client := action.NewList(c.sdkConfig)
 	client.Deployed = true
 
@@ -73,6 +75,8 @@ func (c *Collector) Run(ctx context.Context, _ *config.Config) (
 	for i, rel := range results {
 		releases[i] = rel
 	}
+
+	log.Info().Int("amount", len(releases)).Msg("Finished collecting Helm repositories")
 
 	return "helm_releases", releases, nil
 }

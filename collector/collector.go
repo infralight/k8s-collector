@@ -3,6 +3,7 @@ package collector
 import (
 	"context"
 	"fmt"
+	"github.com/rs/zerolog/log"
 	"net/http"
 	"regexp"
 
@@ -79,14 +80,15 @@ func (f *Collector) Run(ctx context.Context) (err error) {
 	if !clusterIDRegex.MatchString(f.clusterID) {
 		return fmt.Errorf("invalid cluster ID, must match %s", clusterIDRegex)
 	}
-
+	log.Debug().Msg("Authenticating to Infralight App Server")
 	// authenticate with the Infralight API
 	f.accessToken, err = f.authenticate()
 	if err != nil {
 		return fmt.Errorf("failed authenticating with Infralight API: %w", err)
 	}
-
+	log.Info().Msg("Authenticated to Infralight App Server successfully")
 	fullData := make(map[string]interface{}, len(f.dataCollectors))
+	log.Debug().Int("amount", len(f.dataCollectors)).Msg("Running Kubernetes collectors")
 	for _, dc := range f.dataCollectors {
 		keyName, data, err := dc.Run(ctx, f.conf)
 		if err != nil {
@@ -95,7 +97,7 @@ func (f *Collector) Run(ctx context.Context) (err error) {
 
 		fullData[keyName] = data
 	}
-
+	log.Debug().Msg("Sending data to Infralight App Server")
 	err = f.send(fullData)
 	if err != nil {
 		return fmt.Errorf("failed sending objects to Infralight: %w", err)
