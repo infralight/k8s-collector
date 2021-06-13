@@ -3,11 +3,12 @@ package collector
 import (
 	"context"
 	"fmt"
-	"github.com/rs/zerolog/log"
 	"net/http"
 	"regexp"
 
 	"github.com/ido50/requests"
+	"github.com/rs/zerolog/log"
+
 	"github.com/infralight/k8s-collector/collector/config"
 )
 
