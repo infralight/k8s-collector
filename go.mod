@@ -9,8 +9,8 @@ require (
 	github.com/rs/zerolog v1.20.0
 	go.uber.org/multierr v1.6.0 // indirect
 	go.uber.org/zap v1.16.0 // indirect
+	gopkg.in/mgo.v2 v2.0.0-20190816093944-a6b53ec6cb22
 	helm.sh/helm/v3 v3.5.1
-	k8s.io/api v0.20.5
 	k8s.io/apimachinery v0.20.5
 	k8s.io/client-go v0.20.5
 	rsc.io/letsencrypt v0.0.3 // indirect

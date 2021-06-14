@@ -3,16 +3,20 @@ package main
 import (
 	"context"
 	"flag"
+	"fmt"
 	"os"
+
+	"github.com/rs/zerolog"
+	"github.com/rs/zerolog/log"
+	_ "k8s.io/client-go/plugin/pkg/client/auth"
+	"k8s.io/client-go/rest"
+	"k8s.io/client-go/tools/clientcmd"
 
 	"github.com/infralight/k8s-collector/collector"
 	"github.com/infralight/k8s-collector/collector/config"
 	"github.com/infralight/k8s-collector/collector/helm"
 	"github.com/infralight/k8s-collector/collector/k8s"
 	"github.com/infralight/k8s-collector/collector/k8stypes"
-	"github.com/rs/zerolog"
-	"github.com/rs/zerolog/log"
-	_ "k8s.io/client-go/plugin/pkg/client/auth"
 )
 
 func main() {
@@ -44,15 +48,22 @@ func main() {
 			Msg("Failed loading collector configuration")
 	}
 
+	apiConfig, err := loadKubeConfig(*external)
+	if err != nil {
+		logger.Panic().
+			Err(err).
+			Msg("Failed loading Kubernetes configuration")
+	}
+
 	// Load the Kubernetes collector
-	k8sCollector, err := k8s.DefaultConfiguration(*external)
+	k8sCollector, err := k8s.DefaultConfiguration(apiConfig)
 	if err != nil {
 		logger.Fatal().
 			Err(err).
 			Msg("Failed loading Kubernetes collector")
 	}
 
-	k8sTypesCollector, err := k8stypes.DefaultConfiguration(*external)
+	k8sTypesCollector, err := k8stypes.DefaultConfiguration(apiConfig)
 	if err != nil {
 		logger.Fatal().
 			Err(err).
@@ -68,7 +79,7 @@ func main() {
 	}
 
 	err = collector.
-		New(clusterID, conf, k8sCollector, helmCollector, k8sTypesCollector).
+		New(clusterID, apiConfig, conf, k8sCollector, helmCollector, k8sTypesCollector).
 		Run(context.TODO())
 	if err != nil {
 		logger.Fatal().
@@ -77,6 +88,22 @@ func main() {
 	}
 
 	logger.Info().Msg("Fetcher successfully finished")
+}
+
+func loadKubeConfig(external string) (apiConfig *rest.Config, err error) {
+	// Load configuration for the Kubernetes API client. We are either running
+	// from inside the cluster (i.e. inside a pod) or outside of the cluster.
+	if external != "" {
+		apiConfig, err = clientcmd.BuildConfigFromFlags("", external)
+	} else {
+		// Load configuration to connect to the Kubernetes API from within a K8s
+		// cluster
+		apiConfig, err = rest.InClusterConfig()
+	}
+	if err != nil {
+		return apiConfig, fmt.Errorf("failed loading Kubernetes configuration: %w", err)
+	}
+	return apiConfig, nil
 }
 
 func loadLogger(debug bool) *zerolog.Logger {

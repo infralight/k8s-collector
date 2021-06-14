@@ -45,7 +45,7 @@ func Test_loadConfig(t *testing.T) {
 				AccessKey:                   "access",
 				SecretKey:                   "secret",
 				Endpoint:                    "http://localhost:5000/api",
-				FetchEvents:                 true,
+				FetchEvents:                 false,
 				FetchConfigMaps:             true,
 				FetchReplicationControllers: true,
 				FetchSecrets:                false,
@@ -64,6 +64,7 @@ func Test_loadConfig(t *testing.T) {
 				FetchCronJobs:               true,
 				FetchIngresses:              true,
 				FetchClusterRoles:           true,
+				OverrideMasterUrl:           false,
 			},
 		},
 		{
@@ -85,7 +86,7 @@ func Test_loadConfig(t *testing.T) {
 				Endpoint:                    "http://localhost:5000/api",
 				Namespace:                   "namespace",
 				IgnoreNamespaces:            []string{"one", "two"},
-				FetchEvents:                 true,
+				FetchEvents:                 false,
 				FetchConfigMaps:             true,
 				FetchReplicationControllers: true,
 				FetchSecrets:                true,
@@ -104,6 +105,7 @@ func Test_loadConfig(t *testing.T) {
 				FetchCronJobs:               true,
 				FetchIngresses:              true,
 				FetchClusterRoles:           true,
+				OverrideMasterUrl:           false,
 			},
 		},
 	}

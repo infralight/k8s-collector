@@ -7,7 +7,6 @@ data:
   collector.watchNamespace: default
   collector.ignoreNamespaces: |
     kube-system
-  collector.resources.events: "true"
   collector.resources.replicationControllers: "true"
   collector.resources.services: "true"
   collector.resources.serviceAccounts: "true"
@@ -26,7 +25,17 @@ data:
   collector.resources.ingresses: "true"
   collector.resources.clusterRoles: "true"
 {{- if .Values.collectSecrets}}
+  collector.resources.events: "true"
+{{- else }}
+  collector.resources.events: "false"
+{{- end }}
+{{- if .Values.collectSecrets}}
   collector.resources.secrets: "true"
 {{- else }}
   collector.resources.secrets: "false"
+{{- end }}
+{{- if .Values.overrideMasterUrl}}
+  collector.overrideMasterUrl: "true"
+{{- else }}
+  collector.overrideMasterUrl: "false"
 {{- end }}

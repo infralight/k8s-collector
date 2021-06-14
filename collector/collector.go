@@ -2,12 +2,15 @@ package collector
 
 import (
 	"context"
+	b64 "encoding/base64"
 	"fmt"
 	"net/http"
 	"regexp"
 
 	"github.com/ido50/requests"
 	"github.com/rs/zerolog/log"
+	"gopkg.in/mgo.v2/bson"
+	"k8s.io/client-go/rest"
 
 	"github.com/infralight/k8s-collector/collector/config"
 )
@@ -40,6 +43,9 @@ type Collector struct {
 	// provided externally)
 	clusterID string
 
+	// Cluster configuration
+	clusterConfig *rest.Config
+
 	// the collector's configuration
 	conf *config.Config
 
@@ -59,6 +65,7 @@ var clusterIDRegex = regexp.MustCompile(`^[a-z0-9-_]+$`)
 // A configuration object must be provided.
 func New(
 	clusterID string,
+	clusterConfig *rest.Config,
 	conf *config.Config,
 	dataCollectors ...DataCollector,
 ) *Collector {
@@ -68,6 +75,7 @@ func New(
 
 	return &Collector{
 		conf:           conf,
+		clusterConfig:  clusterConfig,
 		clusterID:      clusterID,
 		dataCollectors: dataCollectors,
 	}
@@ -88,6 +96,11 @@ func (f *Collector) Run(ctx context.Context) (err error) {
 		return fmt.Errorf("failed authenticating with Infralight API: %w", err)
 	}
 	log.Info().Msg("Authenticated to Infralight App Server successfully")
+	fetchingId, err := f.startNewFetching()
+	if err != nil {
+		return fmt.Errorf("failed starting new fetching with Infralight API: %w", err)
+	}
+	log.Info().Str("fetchingId", fetchingId).Msg("Starting new fetching process")
 	fullData := make(map[string]interface{}, len(f.dataCollectors))
 	log.Debug().Int("amount", len(f.dataCollectors)).Msg("Running Kubernetes collectors")
 	for _, dc := range f.dataCollectors {
@@ -98,6 +111,7 @@ func (f *Collector) Run(ctx context.Context) (err error) {
 
 		fullData[keyName] = data
 	}
+	fullData["fetchingId"] = fetchingId
 	log.Debug().Msg("Sending data to Infralight App Server")
 	err = f.send(fullData)
 	if err != nil {
@@ -125,6 +139,23 @@ func (f *Collector) authenticate() (accessToken string, err error) {
 	return credentials.Token, err
 }
 
+func (f *Collector) startNewFetching() (fetchingId string, err error) {
+	fetchingId = bson.NewObjectId().Hex()
+	var overrideMasterUrl string
+	if f.conf.OverrideMasterUrl {
+		overrideMasterUrl = "&overrideMasterUrl=1"
+	}
+	var masterUrl = b64.StdEncoding.EncodeToString([]byte(f.clusterConfig.Host))
+	err = requests.NewClient(f.conf.Endpoint).
+		Header("Authorization", fmt.Sprintf("Bearer %s", f.accessToken)).
+		NewRequest("HEAD", fmt.Sprintf("/integrations/k8s/%s/fetching?masterUrl=%s&fetchingId=%s%s",
+			f.clusterID, masterUrl, fetchingId, overrideMasterUrl)).
+		CompressWith(requests.CompressionAlgorithmGzip).
+		ExpectedStatus(http.StatusNoContent).
+		Run()
+	return fetchingId, err
+}
+
 func (f *Collector) send(data map[string]interface{}) error {
 	f.conf.Log.Debug().
 		Interface("data", data).
@@ -132,7 +163,7 @@ func (f *Collector) send(data map[string]interface{}) error {
 
 	return requests.NewClient(f.conf.Endpoint).
 		Header("Authorization", fmt.Sprintf("Bearer %s", f.accessToken)).
-		NewRequest("PUT", fmt.Sprintf("/integrations/k8s/%s", f.clusterID)).
+		NewRequest("POST", fmt.Sprintf("/integrations/k8s/%s/fetching", f.clusterID)).
 		CompressWith(requests.CompressionAlgorithmGzip).
 		ExpectedStatus(http.StatusNoContent).
 		JSONBody(data).
