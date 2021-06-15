@@ -7,7 +7,6 @@ import (
 	"github.com/rs/zerolog/log"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
-	"k8s.io/client-go/tools/clientcmd"
 
 	"github.com/infralight/k8s-collector/collector/config"
 )
@@ -33,24 +32,10 @@ func New(api kubernetes.Interface) *Collector {
 // to connect to a local Kubernetes API Server. When running outside of the
 // Kubernetes cluster, the path to the kubeconfig file must be provided. If
 // empty, the default in-cluster configuration is used.
-func DefaultConfiguration(external string) (
+func DefaultConfiguration(apiConfig *rest.Config) (
 	collector *Collector,
 	err error,
 ) {
-	// Load configuration for the Kubernetes API client. We are either running
-	// from inside the cluster (i.e. inside a pod) or outside of the cluster.
-	var apiConfig *rest.Config
-	if external != "" {
-		apiConfig, err = clientcmd.BuildConfigFromFlags("", external)
-	} else {
-		// Load configuration to connect to the Kubernetes API from within a K8s
-		// cluster
-		apiConfig, err = rest.InClusterConfig()
-	}
-	if err != nil {
-		return collector, fmt.Errorf("failed loading Kubernetes configuration: %w", err)
-	}
-
 	// Create a new instance of the Kubernetes API client
 	api, err := kubernetes.NewForConfig(apiConfig)
 	if err != nil {

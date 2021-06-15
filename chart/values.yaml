@@ -17,3 +17,5 @@ clusterRole:
   name: "infralight-role"
 
 collectSecrets: false
+collectEvents: false
+overrideUniqueClusterId: false

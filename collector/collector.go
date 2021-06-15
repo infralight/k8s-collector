@@ -8,6 +8,10 @@ import (
 
 	"github.com/ido50/requests"
 	"github.com/rs/zerolog/log"
+	"gopkg.in/mgo.v2/bson"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/rest"
 
 	"github.com/infralight/k8s-collector/collector/config"
 )
@@ -40,6 +44,9 @@ type Collector struct {
 	// provided externally)
 	clusterID string
 
+	// Cluster configuration
+	clusterConfig *rest.Config
+
 	// the collector's configuration
 	conf *config.Config
 
@@ -59,6 +66,7 @@ var clusterIDRegex = regexp.MustCompile(`^[a-z0-9-_]+$`)
 // A configuration object must be provided.
 func New(
 	clusterID string,
+	clusterConfig *rest.Config,
 	conf *config.Config,
 	dataCollectors ...DataCollector,
 ) *Collector {
@@ -68,6 +76,7 @@ func New(
 
 	return &Collector{
 		conf:           conf,
+		clusterConfig:  clusterConfig,
 		clusterID:      clusterID,
 		dataCollectors: dataCollectors,
 	}
@@ -88,6 +97,15 @@ func (f *Collector) Run(ctx context.Context) (err error) {
 		return fmt.Errorf("failed authenticating with Infralight API: %w", err)
 	}
 	log.Info().Msg("Authenticated to Infralight App Server successfully")
+	clutserId, err := f.getClusterId(ctx)
+	if err != nil {
+		return fmt.Errorf("failed finding Kubernetes cluster ID: %w", err)
+	}
+	fetchingId, err := f.startNewFetching(clutserId)
+	if err != nil {
+		return fmt.Errorf("failed starting new fetching with Infralight API: %w", err)
+	}
+	log.Info().Str("fetchingId", fetchingId).Msg("Starting new fetching process")
 	fullData := make(map[string]interface{}, len(f.dataCollectors))
 	log.Debug().Int("amount", len(f.dataCollectors)).Msg("Running Kubernetes collectors")
 	for _, dc := range f.dataCollectors {
@@ -98,6 +116,7 @@ func (f *Collector) Run(ctx context.Context) (err error) {
 
 		fullData[keyName] = data
 	}
+	fullData["fetchingId"] = fetchingId
 	log.Debug().Msg("Sending data to Infralight App Server")
 	err = f.send(fullData)
 	if err != nil {
@@ -125,6 +144,34 @@ func (f *Collector) authenticate() (accessToken string, err error) {
 	return credentials.Token, err
 }
 
+func (f *Collector) getClusterId(ctx context.Context) (clusterId string, err error) {
+	kubeApi, err := kubernetes.NewForConfig(f.clusterConfig)
+	if err != nil {
+		return clusterId, fmt.Errorf("Failed creating Kubernetes Api object: %w", err)
+	}
+	kubeSystemNs, err := kubeApi.CoreV1().Namespaces().Get(ctx, "kube-system", metav1.GetOptions{})
+	if err != nil {
+		return clusterId, fmt.Errorf("Failed finding `kube-system` Kubernetes namespace: %w", err)
+	}
+	return string(kubeSystemNs.GetObjectMeta().GetUID()), nil
+}
+
+func (f *Collector) startNewFetching(clusterUniqueId string) (fetchingId string, err error) {
+	fetchingId = bson.NewObjectId().Hex()
+	var overrideUniqueClusterId string
+	if f.conf.OverrideUniqueClusterId {
+		overrideUniqueClusterId = "&overrideUniqueClusterId=1"
+	}
+	err = requests.NewClient(f.conf.Endpoint).
+		Header("Authorization", fmt.Sprintf("Bearer %s", f.accessToken)).
+		NewRequest("HEAD", fmt.Sprintf("/integrations/k8s/%s/fetching?clusterUniqueId=%s&fetchingId=%s%s",
+			f.clusterID, clusterUniqueId, fetchingId, overrideUniqueClusterId)).
+		CompressWith(requests.CompressionAlgorithmGzip).
+		ExpectedStatus(http.StatusNoContent).
+		Run()
+	return fetchingId, err
+}
+
 func (f *Collector) send(data map[string]interface{}) error {
 	f.conf.Log.Debug().
 		Interface("data", data).
@@ -132,7 +179,7 @@ func (f *Collector) send(data map[string]interface{}) error {
 
 	return requests.NewClient(f.conf.Endpoint).
 		Header("Authorization", fmt.Sprintf("Bearer %s", f.accessToken)).
-		NewRequest("PUT", fmt.Sprintf("/integrations/k8s/%s", f.clusterID)).
+		NewRequest("POST", fmt.Sprintf("/integrations/k8s/%s/fetching", f.clusterID)).
 		CompressWith(requests.CompressionAlgorithmGzip).
 		ExpectedStatus(http.StatusNoContent).
 		JSONBody(data).
