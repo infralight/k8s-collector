@@ -107,8 +107,8 @@ type Config struct {
 	FetchIngresses bool
 	// FetchClusterRoles is a boolean indicating whether to collect Kubernetes ClusterRoles
 	FetchClusterRoles bool
-	// OverrideMasterUrl is a boolean indicating whether to override the master url of the Kubernetes integration
-	OverrideMasterUrl bool
+	// OverrideUniqueClusterId is a boolean indicating whether to override the master url of the Kubernetes integration
+	OverrideUniqueClusterId bool
 }
 
 // LoadConfig creates a new configuration object. A logger object, a file-system
@@ -175,7 +175,7 @@ func LoadConfig(
 	conf.FetchCronJobs = parseBool(conf.etcConfig("collector.resources.cronJobs"), true)
 	conf.FetchIngresses = parseBool(conf.etcConfig("collector.resources.ingresses"), true)
 	conf.FetchClusterRoles = parseBool(conf.etcConfig("collector.resources.clusterRoles"), true)
-	conf.OverrideMasterUrl = parseBool(conf.etcConfig("collector.overrideMasterUrl"), false)
+	conf.OverrideUniqueClusterId = parseBool(conf.etcConfig("collector.OverrideUniqueClusterId"), false)
 
 	return conf, nil
 }

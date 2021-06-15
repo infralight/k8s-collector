@@ -18,4 +18,4 @@ clusterRole:
 
 collectSecrets: false
 collectEvents: false
-overrideMasterUrl: false
+overrideUniqueClusterId: false

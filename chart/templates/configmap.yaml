@@ -34,8 +34,8 @@ data:
 {{- else }}
   collector.resources.secrets: "false"
 {{- end }}
-{{- if .Values.overrideMasterUrl}}
-  collector.overrideMasterUrl: "true"
+{{- if .Values.OverrideUniqueClusterId}}
+  collector.overrideUniqueClusterId: "true"
 {{- else }}
-  collector.overrideMasterUrl: "false"
+  collector.overrideUniqueClusterId: "false"
 {{- end }}

@@ -2,7 +2,6 @@ package collector
 
 import (
 	"context"
-	b64 "encoding/base64"
 	"fmt"
 	"net/http"
 	"regexp"
@@ -10,6 +9,8 @@ import (
 	"github.com/ido50/requests"
 	"github.com/rs/zerolog/log"
 	"gopkg.in/mgo.v2/bson"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 
 	"github.com/infralight/k8s-collector/collector/config"
@@ -96,7 +97,11 @@ func (f *Collector) Run(ctx context.Context) (err error) {
 		return fmt.Errorf("failed authenticating with Infralight API: %w", err)
 	}
 	log.Info().Msg("Authenticated to Infralight App Server successfully")
-	fetchingId, err := f.startNewFetching()
+	clutserId, err := f.getClusterId(ctx)
+	if err != nil {
+		return fmt.Errorf("failed finding Kubernetes cluster ID: %w", err)
+	}
+	fetchingId, err := f.startNewFetching(clutserId)
 	if err != nil {
 		return fmt.Errorf("failed starting new fetching with Infralight API: %w", err)
 	}
@@ -139,17 +144,28 @@ func (f *Collector) authenticate() (accessToken string, err error) {
 	return credentials.Token, err
 }
 
-func (f *Collector) startNewFetching() (fetchingId string, err error) {
-	fetchingId = bson.NewObjectId().Hex()
-	var overrideMasterUrl string
-	if f.conf.OverrideMasterUrl {
-		overrideMasterUrl = "&overrideMasterUrl=1"
+func (f *Collector) getClusterId(ctx context.Context) (clusterId string, err error) {
+	kubeApi, err := kubernetes.NewForConfig(f.clusterConfig)
+	if err != nil {
+		return clusterId, fmt.Errorf("Failed creating Kubernetes Api object: %w", err)
 	}
-	var masterUrl = b64.StdEncoding.EncodeToString([]byte(f.clusterConfig.Host))
+	kubeSystemNs, err := kubeApi.CoreV1().Namespaces().Get(ctx, "kube-system", metav1.GetOptions{})
+	if err != nil {
+		return clusterId, fmt.Errorf("Failed finding `kube-system` Kubernetes namespace: %w", err)
+	}
+	return string(kubeSystemNs.GetObjectMeta().GetUID()), nil
+}
+
+func (f *Collector) startNewFetching(clusterUniqueId string) (fetchingId string, err error) {
+	fetchingId = bson.NewObjectId().Hex()
+	var overrideUniqueClusterId string
+	if f.conf.OverrideUniqueClusterId {
+		overrideUniqueClusterId = "&overrideUniqueClusterId=1"
+	}
 	err = requests.NewClient(f.conf.Endpoint).
 		Header("Authorization", fmt.Sprintf("Bearer %s", f.accessToken)).
-		NewRequest("HEAD", fmt.Sprintf("/integrations/k8s/%s/fetching?masterUrl=%s&fetchingId=%s%s",
-			f.clusterID, masterUrl, fetchingId, overrideMasterUrl)).
+		NewRequest("HEAD", fmt.Sprintf("/integrations/k8s/%s/fetching?clusterUniqueId=%s&fetchingId=%s%s",
+			f.clusterID, clusterUniqueId, fetchingId, overrideUniqueClusterId)).
 		CompressWith(requests.CompressionAlgorithmGzip).
 		ExpectedStatus(http.StatusNoContent).
 		Run()

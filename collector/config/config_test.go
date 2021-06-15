@@ -64,7 +64,7 @@ func Test_loadConfig(t *testing.T) {
 				FetchCronJobs:               true,
 				FetchIngresses:              true,
 				FetchClusterRoles:           true,
-				OverrideMasterUrl:           false,
+				OverrideUniqueClusterId:     false,
 			},
 		},
 		{
@@ -105,7 +105,7 @@ func Test_loadConfig(t *testing.T) {
 				FetchCronJobs:               true,
 				FetchIngresses:              true,
 				FetchClusterRoles:           true,
-				OverrideMasterUrl:           false,
+				OverrideUniqueClusterId:     false,
 			},
 		},
 	}
