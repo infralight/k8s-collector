@@ -2,6 +2,7 @@ package k8s
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 
 	"github.com/rs/zerolog/log"
@@ -59,7 +60,8 @@ func (f *Collector) Source() string {
 // (see here: https://github.com/golang/go/issues/6213), and so JSON objects are
 // missing the "kind" attribute. This is just a workaround to ensure we also
 // send the kind.
-type Object struct {
+
+type KubernetesObject struct {
 	Kind   string      `json:"kind"`
 	Object interface{} `json:"object"`
 }
@@ -72,66 +74,74 @@ func (f *Collector) Run(ctx context.Context, conf *config.Config) (
 	err error,
 ) {
 	log.Debug().Msg("Starting collect Kubernetes objects")
-	var numFailed int
-	var lastErr error
 
-	type fetchFunc struct {
-		kind   string
-		fn     func(context.Context, *config.Config) (items []interface{}, err error)
-		onlyIf bool
+	allowList := map[string]bool{
+		"ClusterRole":           conf.FetchClusterRoles,
+		"ConfigMap":             conf.FetchConfigMaps,
+		"CronJob":               conf.FetchCronJobs,
+		"Event":                 conf.FetchEvents,
+		"DaemonSet":             conf.FetchDaemonSets,
+		"Deployment":            conf.FetchDeployments,
+		"Ingress":               conf.FetchIngresses,
+		"Job":                   conf.FetchJobs,
+		"Namespace":             conf.FetchNamespaces,
+		"Node":                  conf.FetchNodes,
+		"ReplicaSet":            conf.FetchReplicaSets,
+		"ReplicationController": conf.FetchReplicationControllers,
+		"ServiceAccount":        conf.FetchServiceAccounts,
+		"Service":               conf.FetchServices,
+		"Secret":                conf.FetchSecrets,
+		"StatefulSet":           conf.FetchStatefulSets,
+		"PersistentVolumeClaim": conf.FetchPersistentVolumeClaims,
+		"PersistentVolume":      conf.FetchPersistentVolumes,
+		"Pod":                   conf.FetchPods,
 	}
 
-	funcs := []fetchFunc{
-		{"ClusterRole", f.getClusterRoles, conf.FetchClusterRoles},
-		{"ConfigMap", f.getConfigMaps, conf.FetchConfigMaps},
-		{"CronJob", f.getCronJobs, conf.FetchCronJobs},
-		{"Event", f.getEvents, conf.FetchEvents},
-		{"DaemonSet", f.getDaemonSets, conf.FetchDaemonSets},
-		{"Deployment", f.getDeployments, conf.FetchDeployments},
-		{"Ingress", f.getIngresses, conf.FetchIngresses},
-		{"Job", f.getJobs, conf.FetchJobs},
-		{"Namespace", f.getNamespaces, conf.FetchNamespaces},
-		{"Node", f.getNodes, conf.FetchNodes},
-		{"ReplicaSet", f.getReplicaSets, conf.FetchReplicaSets},
-		{"ReplicationController", f.getReplicationControllers, conf.FetchReplicationControllers},
-		{"ServiceAccount", f.getServiceAccounts, conf.FetchServiceAccounts},
-		{"Service", f.getServices, conf.FetchServices},
-		{"Secret", f.getSecrets, conf.FetchSecrets},
-		{"StatefulSet", f.getStatefulSet, conf.FetchStatefulSets},
-		{"PersistentVolumeClaim", f.getPersistentVolumeClaims, conf.FetchPersistentVolumeClaims},
-		{"PersistentVolume", f.getPersistentVolumes, conf.FetchPersistentVolumes},
-		{"Pod", f.getPods, conf.FetchPods},
+	apiResourcesList, err := f.api.Discovery().ServerPreferredResources()
+
+	for _, apiResource := range apiResourcesList {
+		for _, resource := range apiResource.APIResources {
+			var uri string
+			if apiResource.GroupVersion == "v1" && apiResource.APIVersion == "" {
+				// The URL for for api v1 is different from the external apis
+				uri = "api/v1"
+			} else {
+				uri = fmt.Sprintf("apis/%s", apiResource.GroupVersion)
+			}
+			toFetch, ok := allowList[resource.Kind]
+			if toFetch || !ok {
+				itemsResponse := f.api.Discovery().RESTClient().Get().RequestURI(uri).Resource(resource.Name).Do(ctx)
+				var responseCode int
+				itemsResponse.StatusCode(&responseCode)
+				if responseCode != 200 {
+					log.Err(itemsResponse.Error()).Str("ApiVersion", uri).Str("kind", resource.Kind).Msg("Error receiving response while listing resources")
+					continue
+				}
+				type ResourcesListResponse struct {
+					Kind       string                   `json:"kind"`
+					APIVersion string                   `json:"apiVersion"`
+					Items      []map[string]interface{} `json:"items"`
+				}
+				var itemsDict = ResourcesListResponse{}
+				responseData, err := itemsResponse.Raw()
+				if err != nil {
+					log.Err(err).Str("ApiVersion", uri).Str("kind", resource.Kind).Msg("Error reading response while listing resources")
+				}
+				json.Unmarshal(responseData, &itemsDict)
+				for _, item := range itemsDict.Items {
+					item["apiVersion"] = apiResource.GroupVersion
+					item["Kind"] = resource.Kind
+					objects = append(objects, KubernetesObject{
+						Kind:   resource.Kind,
+						Object: item,
+					})
+				}
+				log.Debug().Int("items", len(itemsDict.Items)).Str("ApiVersion", uri).Str("kind", resource.Kind).Msg("Found items for resource")
+			} else {
+				log.Warn().Str("ApiVersion", uri).Str("kind", resource.Kind).Msg("Ignoring resources due to policy")
+			}
+		}
 	}
-
-	for _, fn := range funcs {
-		if !fn.onlyIf {
-			continue
-		}
-
-		items, err := fn.fn(ctx, conf)
-		if err != nil {
-			numFailed++
-			lastErr = fmt.Errorf("failed collecting %s: %w", fn.kind, err)
-			continue
-		}
-
-		if len(items) == 0 {
-			continue
-		}
-
-		for _, item := range items {
-			objects = append(objects, Object{
-				Kind:   fn.kind,
-				Object: item,
-			})
-		}
-	}
-
-	if numFailed == len(funcs) {
-		return "k8s_objects", objects, lastErr
-	}
-
-	log.Info().Int("amount", len(objects)).Msg("Finished collecting Kubernetes objects")
-
+	log.Info().Int("items", len(objects)).Int("apis", len(apiResourcesList)).Msg("Finished Kubernetes cluster fetching")
 	return "k8s_objects", objects, nil
 }

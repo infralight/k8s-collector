@@ -97,11 +97,11 @@ func (f *Collector) Run(ctx context.Context) (err error) {
 		return fmt.Errorf("failed authenticating with Infralight API: %w", err)
 	}
 	log.Info().Msg("Authenticated to Infralight App Server successfully")
-	clutserId, err := f.getClusterId(ctx)
+	uniqueClusterId, err := f.getUniqueClusterId(ctx)
 	if err != nil {
-		return fmt.Errorf("failed finding Kubernetes cluster ID: %w", err)
+		return fmt.Errorf("failed finding Kubernetes unique cluster ID: %w", err)
 	}
-	fetchingId, err := f.startNewFetching(clutserId)
+	fetchingId, err := f.startNewFetching(uniqueClusterId)
 	if err != nil {
 		return fmt.Errorf("failed starting new fetching with Infralight API: %w", err)
 	}
@@ -144,7 +144,7 @@ func (f *Collector) authenticate() (accessToken string, err error) {
 	return credentials.Token, err
 }
 
-func (f *Collector) getClusterId(ctx context.Context) (clusterId string, err error) {
+func (f *Collector) getUniqueClusterId(ctx context.Context) (clusterId string, err error) {
 	kubeApi, err := kubernetes.NewForConfig(f.clusterConfig)
 	if err != nil {
 		return clusterId, fmt.Errorf("Failed creating Kubernetes Api object: %w", err)
