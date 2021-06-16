@@ -98,6 +98,9 @@ func (f *Collector) Run(ctx context.Context, conf *config.Config) (
 	}
 
 	apiResourcesList, err := f.api.Discovery().ServerPreferredResources()
+	if err != nil {
+		return "k8s_objects", nil, fmt.Errorf("failed receiving Kubernetes resources: %w", err)
+	}
 
 	for _, apiResource := range apiResourcesList {
 		for _, resource := range apiResource.APIResources {
@@ -114,7 +117,8 @@ func (f *Collector) Run(ctx context.Context, conf *config.Config) (
 				var responseCode int
 				itemsResponse.StatusCode(&responseCode)
 				if responseCode != 200 {
-					log.Err(itemsResponse.Error()).Str("ApiVersion", uri).Str("kind", resource.Kind).Msg("Error receiving response while listing resources")
+					log.Err(itemsResponse.Error()).Str("ApiVersion", uri).Str("kind", resource.Kind).
+						Msg("Error receiving response while listing resources")
 					continue
 				}
 				type ResourcesListResponse struct {
@@ -125,9 +129,15 @@ func (f *Collector) Run(ctx context.Context, conf *config.Config) (
 				var itemsDict = ResourcesListResponse{}
 				responseData, err := itemsResponse.Raw()
 				if err != nil {
-					log.Err(err).Str("ApiVersion", uri).Str("kind", resource.Kind).Msg("Error reading response while listing resources")
+					log.Err(err).Str("ApiVersion", uri).Str("kind", resource.Kind).
+						Msg("Error reading response while listing resources")
+					continue
 				}
-				json.Unmarshal(responseData, &itemsDict)
+				err = json.Unmarshal(responseData, &itemsDict)
+				if err != nil {
+					log.Err(err).Str("ApiVersion", uri).Str("kind", resource.Kind).
+						Msg("Failed loading json resources from response")
+				}
 				for _, item := range itemsDict.Items {
 					item["apiVersion"] = apiResource.GroupVersion
 					item["Kind"] = resource.Kind
@@ -136,12 +146,15 @@ func (f *Collector) Run(ctx context.Context, conf *config.Config) (
 						Object: item,
 					})
 				}
-				log.Debug().Int("items", len(itemsDict.Items)).Str("ApiVersion", uri).Str("kind", resource.Kind).Msg("Found items for resource")
+				log.Debug().Int("items", len(itemsDict.Items)).Str("ApiVersion", uri).
+					Str("kind", resource.Kind).Msg("Found items for resource")
 			} else {
-				log.Warn().Str("ApiVersion", uri).Str("kind", resource.Kind).Msg("Ignoring resources due to policy")
+				log.Warn().Str("ApiVersion", uri).Str("kind", resource.Kind).
+					Msg("Ignoring resources due to policy")
 			}
 		}
 	}
-	log.Info().Int("items", len(objects)).Int("apis", len(apiResourcesList)).Msg("Finished Kubernetes cluster fetching")
+	log.Info().Int("items", len(objects)).Int("apis", len(apiResourcesList)).
+		Msg("Finished Kubernetes cluster fetching")
 	return "k8s_objects", objects, nil
 }
