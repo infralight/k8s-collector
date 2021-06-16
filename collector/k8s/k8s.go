@@ -112,46 +112,50 @@ func (f *Collector) Run(ctx context.Context, conf *config.Config) (
 				uri = fmt.Sprintf("apis/%s", apiResource.GroupVersion)
 			}
 			toFetch, ok := allowList[resource.Kind]
-			if toFetch || !ok {
-				itemsResponse := f.api.Discovery().RESTClient().Get().RequestURI(uri).Resource(resource.Name).Do(ctx)
-				var responseCode int
-				itemsResponse.StatusCode(&responseCode)
-				if responseCode != 200 {
-					log.Err(itemsResponse.Error()).Str("ApiVersion", uri).Str("kind", resource.Kind).
-						Msg("Error receiving response while listing resources")
-					continue
-				}
-				type ResourcesListResponse struct {
-					Kind       string                   `json:"kind"`
-					APIVersion string                   `json:"apiVersion"`
-					Items      []map[string]interface{} `json:"items"`
-				}
-				var itemsDict = ResourcesListResponse{}
-				responseData, err := itemsResponse.Raw()
-				if err != nil {
-					log.Err(err).Str("ApiVersion", uri).Str("kind", resource.Kind).
-						Msg("Error reading response while listing resources")
-					continue
-				}
-				err = json.Unmarshal(responseData, &itemsDict)
-				if err != nil {
-					log.Err(err).Str("ApiVersion", uri).Str("kind", resource.Kind).
-						Msg("Failed loading json resources from response")
-				}
-				for _, item := range itemsDict.Items {
-					item["apiVersion"] = apiResource.GroupVersion
-					item["Kind"] = resource.Kind
-					objects = append(objects, KubernetesObject{
-						Kind:   resource.Kind,
-						Object: item,
-					})
-				}
-				log.Debug().Int("items", len(itemsDict.Items)).Str("ApiVersion", uri).
-					Str("kind", resource.Kind).Msg("Found items for resource")
-			} else {
+			// CRD doesn't appear in the allowed list
+			isCRD := !ok
+			if !toFetch && !isCRD {
+				// Skipping a resource due to policy
 				log.Warn().Str("ApiVersion", uri).Str("kind", resource.Kind).
 					Msg("Ignoring resources due to policy")
+				continue
 			}
+			itemsResponse := f.api.Discovery().RESTClient().Get().RequestURI(uri).Resource(resource.Name).Do(ctx)
+			var responseCode int
+			itemsResponse.StatusCode(&responseCode)
+			if responseCode != 200 {
+				log.Err(itemsResponse.Error()).Str("ApiVersion", uri).Str("kind", resource.Kind).
+					Msg("Error receiving response while listing resources")
+				continue
+			}
+			type ResourcesListResponse struct {
+				Kind       string                   `json:"kind"`
+				APIVersion string                   `json:"apiVersion"`
+				Items      []map[string]interface{} `json:"items"`
+			}
+			var itemsDict = ResourcesListResponse{}
+			responseData, err := itemsResponse.Raw()
+			if err != nil {
+				log.Err(err).Str("ApiVersion", uri).Str("kind", resource.Kind).
+					Msg("Error reading response while listing resources")
+				continue
+			}
+			err = json.Unmarshal(responseData, &itemsDict)
+			if err != nil {
+				log.Err(err).Str("ApiVersion", uri).Str("kind", resource.Kind).
+					Msg("Failed loading json resources from response")
+			}
+			for _, item := range itemsDict.Items {
+				item["apiVersion"] = apiResource.GroupVersion
+				item["Kind"] = resource.Kind
+				objects = append(objects, KubernetesObject{
+					Kind:   resource.Kind,
+					Object: item,
+				})
+			}
+			log.Debug().Int("items", len(itemsDict.Items)).Str("ApiVersion", uri).
+				Str("kind", resource.Kind).Msg("Found items for resource")
+
 		}
 	}
 	log.Info().Int("items", len(objects)).Int("apis", len(apiResourcesList)).
