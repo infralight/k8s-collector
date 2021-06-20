@@ -24,7 +24,7 @@ data:
   collector.resources.cronJobs: "true"
   collector.resources.ingresses: "true"
   collector.resources.clusterRoles: "true"
-{{- if .Values.collectSecrets}}
+{{- if .Values.collectEvents}}
   collector.resources.events: "true"
 {{- else }}
   collector.resources.events: "false"
@@ -34,7 +34,7 @@ data:
 {{- else }}
   collector.resources.secrets: "false"
 {{- end }}
-{{- if .Values.OverrideUniqueClusterId}}
+{{- if .Values.overrideUniqueClusterId}}
   collector.overrideUniqueClusterId: "true"
 {{- else }}
   collector.overrideUniqueClusterId: "false"
