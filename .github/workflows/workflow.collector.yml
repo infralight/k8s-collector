@@ -1,0 +1,51 @@
+name: Infralight K8s Collector
+on:
+  workflow_dispatch:
+    inputs:
+      dest:
+        description: 'Environment to deploy [stag|prod]'     
+        required: true
+        default: 'stag'
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v2
+
+    - name: Set up Go
+      uses: actions/setup-go@v2
+      with:
+        go-version: 1.16
+
+    - name: Build
+      run: go build -v ./...
+
+    - name: Test
+      run: go test -v ./...
+      
+    - name: Run golangci-lint
+      uses: golangci/golangci-lint-action@v2.5.1
+
+    - name: Set up QEMU
+      uses: docker/setup-qemu-action@v1
+
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v1
+
+    - name: Login to DockerHub
+      uses: docker/login-action@v1
+      with:
+        username: ${{ secrets.DOCKERHUB_USERNAME }}
+        password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+    - name: Get current time
+      uses: gerred/actions/current-time@master
+      id: current-time
+
+    - name: Build and push
+      uses: docker/build-push-action@v2
+      with:
+        push: true
+        tags: infralightio/k8s-collector:1.0.0,infralightio/k8s-collector:latest
+        labels: org.opencontainers.image.created=${{ steps.current-time.outputs.time }}
