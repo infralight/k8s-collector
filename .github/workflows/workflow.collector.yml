@@ -2,10 +2,10 @@ name: Infralight K8s Collector
 on:
   workflow_dispatch:
     inputs:
-      dest:
-        description: 'Environment to deploy [stag|prod]'     
+      collectortag:
+        description: 'Version Tag for the Collector Docker Image'
         required: true
-        default: 'stag'
+        default: '1.0.0'
 
 jobs:
   build:
@@ -43,9 +43,10 @@ jobs:
       uses: gerred/actions/current-time@master
       id: current-time
 
-    - name: Build and push
+    - name: Build and push image to prod
+      if: ${{ github.ref == 'refs/heads/main' }}
       uses: docker/build-push-action@v2
       with:
         push: true
-        tags: infralightio/k8s-collector:1.0.0,infralightio/k8s-collector:latest
-        labels: org.opencontainers.image.created=${{ steps.current-time.outputs.time }}
+        tags: infralightio/k8s-collector:${{ github.event.inputs.collectortag }},infralightio/k8s-collector:latest
+        labels: org.opencontainers.image.created=${{ steps.current-time.outputs.time }},org.opencontainers.image.authors=Infralight,org.opencontainers.image.revision=${{ github.sha }},org.opencontainers.image.version=${{ github.event.inputs.collectortag }}
