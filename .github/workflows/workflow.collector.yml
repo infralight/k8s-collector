@@ -1,4 +1,4 @@
-name: Infralight K8s Collector
+name: Build K8s Collector Image
 on:
   workflow_dispatch:
     inputs:
@@ -6,26 +6,11 @@ on:
         description: 'Version Tag for the Collector Docker Image'
         required: true
         default: '1.0.0'
-
 jobs:
   build:
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v2
-
-    - name: Set up Go
-      uses: actions/setup-go@v2
-      with:
-        go-version: 1.16
-
-    - name: Build
-      run: go build -v ./...
-
-    - name: Test
-      run: go test -v ./...
-      
-    - name: Run golangci-lint
-      uses: golangci/golangci-lint-action@v2.5.1
 
     - name: Set up QEMU
       uses: docker/setup-qemu-action@v1
