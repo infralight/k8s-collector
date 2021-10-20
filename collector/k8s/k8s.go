@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"strings"
 
 	"github.com/rs/zerolog/log"
 	"k8s.io/client-go/kubernetes"
@@ -117,6 +118,11 @@ func (f *Collector) Run(ctx context.Context, conf *config.Config) (
 			if !toFetch && !isCRD {
 				// Skipping a resource due to policy
 				log.Warn().Str("ApiVersion", uri).Str("kind", resource.Kind).
+					Msg("Ignoring resources due to policy")
+				continue
+			}
+			if !strings.Contains(resource.Verbs.String(), "list") {
+				log.Debug().Str("ApiVersion", uri).Str("kind", resource.Kind).
 					Msg("Ignoring resources due to policy")
 				continue
 			}

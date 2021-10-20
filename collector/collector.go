@@ -217,7 +217,7 @@ func (f *Collector) sendK8sObjects(fetchingId string, data []interface{}) error 
 			body["k8sObjects"] = objects
 			err := requests.NewClient(f.conf.Endpoint).
 				Header("Authorization", fmt.Sprintf("Bearer %s", f.accessToken)).
-				NewRequest("POST", fmt.Sprintf("/integrations/k8s/%s/objects", f.clusterID)).
+				NewRequest("POST", fmt.Sprintf("/integrations/k8s/%s/fetching/objects", f.clusterID)).
 				CompressWith(requests.CompressionAlgorithmGzip).
 				ExpectedStatus(http.StatusNoContent).
 				JSONBody(body).
@@ -228,10 +228,11 @@ func (f *Collector) sendK8sObjects(fetchingId string, data []interface{}) error 
 					Msg("Error sending resources to server")
 				return err
 			}
-			log.Debug().Str("ClusterId", f.clusterID).Int("Page", page).
+			log.Info().Str("ClusterId", f.clusterID).Int("Page", page).
 				Int("ResourcesInPage", len(objects)).Int("PageMessageSize", totalBytes).
 				Msg("Send k8s objects page successfully")
 			objects = []interface{}{}
+			totalBytes = 0
 		}
 	}
 	log.Info().
@@ -261,14 +262,14 @@ func (f *Collector) sendHelmReleases(fetchingId string, data []interface{}, type
 		totalBytes += len(bytes)
 		objects = append(objects, obj)
 
-		if totalBytes+len(bytes) > f.conf.PageSize*1000 || idx == len(data)-1 {
+		if totalBytes > f.conf.PageSize*1000 || idx == len(data)-1 {
 			body := make(map[string]interface{}, 3)
 			body["fetchingId"] = fetchingId
 			body["helmReleases"] = objects
 			body["k8sTypes"] = types
 			err := requests.NewClient(f.conf.Endpoint).
 				Header("Authorization", fmt.Sprintf("Bearer %s", f.accessToken)).
-				NewRequest("POST", fmt.Sprintf("/integrations/k8s/%s/helm", f.clusterID)).
+				NewRequest("POST", fmt.Sprintf("/integrations/k8s/%s/fetching/helm", f.clusterID)).
 				CompressWith(requests.CompressionAlgorithmGzip).
 				ExpectedStatus(http.StatusNoContent).
 				JSONBody(body).
@@ -279,10 +280,11 @@ func (f *Collector) sendHelmReleases(fetchingId string, data []interface{}, type
 					Msg("Error sending resources to server")
 				return err
 			}
-			log.Debug().Str("ClusterId", f.clusterID).Int("Page", page).
+			log.Info().Str("ClusterId", f.clusterID).Int("Page", page).
 				Int("ResourcesInPage", len(objects)).Int("PageMessageSize", totalBytes).
 				Msg("Send helm releases page successfully")
 			objects = []interface{}{}
+			totalBytes = 0
 		}
 	}
 	log.Info().
