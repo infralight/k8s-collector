@@ -212,6 +212,7 @@ func (f *Collector) sendK8sObjects(fetchingId string, data []interface{}) error 
 		totalBytes += len(bytes)
 		objects = append(objects, obj)
 		if totalBytes > f.conf.PageSize*1000 || idx == len(data)-1 {
+			page += 1
 			body := make(map[string]interface{}, 2)
 			body["fetchingId"] = fetchingId
 			body["k8sObjects"] = objects
@@ -223,22 +224,22 @@ func (f *Collector) sendK8sObjects(fetchingId string, data []interface{}) error 
 				JSONBody(body).
 				Run()
 			if err != nil {
-				log.Err(err).Str("ClusterId", f.clusterID).Int("Page", page).
+				log.Err(err).Str("ClusterId", f.clusterID).Int("Page", page).Str("FetchingId", fetchingId).
 					Int("ResourcesInPage", len(objects)).Int("PageMessageSize", totalBytes).
 					Msg("Error sending resources to server")
 				return err
 			}
-			log.Info().Str("ClusterId", f.clusterID).Int("Page", page).
+			log.Info().Str("ClusterId", f.clusterID).Int("Page", page).Str("FetchingId", fetchingId).
 				Int("ResourcesInPage", len(objects)).Int("PageMessageSize", totalBytes).
-				Msg("Send k8s objects page successfully")
+				Msg("Sent k8s objects page successfully")
 			objects = []interface{}{}
 			totalBytes = 0
 		}
 	}
 	log.Info().
 		Str("FetchingId", fetchingId).
-		Int("MessageSize", len(data)).
-		Msg("Send helm releases successfully")
+		Int("Resources", len(data)).
+		Msg("Sent helm releases successfully")
 	return nil
 }
 
@@ -263,6 +264,7 @@ func (f *Collector) sendHelmReleases(fetchingId string, data []interface{}, type
 		objects = append(objects, obj)
 
 		if totalBytes > f.conf.PageSize*1000 || idx == len(data)-1 {
+			page += 1
 			body := make(map[string]interface{}, 3)
 			body["fetchingId"] = fetchingId
 			body["helmReleases"] = objects
@@ -275,21 +277,21 @@ func (f *Collector) sendHelmReleases(fetchingId string, data []interface{}, type
 				JSONBody(body).
 				Run()
 			if err != nil {
-				log.Err(err).Str("ClusterId", f.clusterID).Int("Page", page).
+				log.Err(err).Str("ClusterId", f.clusterID).Int("Page", page).Str("FetchingId", fetchingId).
 					Int("ResourcesInPage", len(objects)).Int("PageMessageSize", totalBytes).
 					Msg("Error sending resources to server")
 				return err
 			}
-			log.Info().Str("ClusterId", f.clusterID).Int("Page", page).
+			log.Info().Str("ClusterId", f.clusterID).Int("Page", page).Str("FetchingId", fetchingId).
 				Int("ResourcesInPage", len(objects)).Int("PageMessageSize", totalBytes).
-				Msg("Send helm releases page successfully")
+				Msg("Sent helm releases page successfully")
 			objects = []interface{}{}
 			totalBytes = 0
 		}
 	}
 	log.Info().
 		Str("FetchingId", fetchingId).
-		Int("MessageSize", len(data)).
-		Msg("Send helm releases successfully")
+		Int("Resources", len(data)).
+		Msg("Sent all helm releases successfully")
 	return nil
 }
