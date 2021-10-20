@@ -65,6 +65,7 @@ func Test_loadConfig(t *testing.T) {
 				FetchIngresses:              true,
 				FetchClusterRoles:           true,
 				OverrideUniqueClusterId:     false,
+				PageSize:                    500,
 			},
 		},
 		{
@@ -106,6 +107,7 @@ func Test_loadConfig(t *testing.T) {
 				FetchIngresses:              true,
 				FetchClusterRoles:           true,
 				OverrideUniqueClusterId:     false,
+				PageSize:                    500,
 			},
 		},
 	}
