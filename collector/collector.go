@@ -2,6 +2,7 @@ package collector
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"net/http"
 	"regexp"
@@ -106,7 +107,7 @@ func (f *Collector) Run(ctx context.Context) (err error) {
 		return fmt.Errorf("failed starting new fetching with Infralight API: %w", err)
 	}
 	log.Info().Str("fetchingId", fetchingId).Msg("Starting new fetching process")
-	fullData := make(map[string]interface{}, len(f.dataCollectors))
+	fullData := make(map[string][]interface{}, len(f.dataCollectors))
 	log.Debug().Int("amount", len(f.dataCollectors)).Msg("Running Kubernetes collectors")
 	for _, dc := range f.dataCollectors {
 		keyName, data, err := dc.Run(ctx, f.conf)
@@ -116,11 +117,17 @@ func (f *Collector) Run(ctx context.Context) (err error) {
 
 		fullData[keyName] = data
 	}
-	fullData["fetchingId"] = fetchingId
 	log.Debug().Msg("Sending data to Infralight App Server")
-	err = f.send(fullData)
+	err = f.sendK8sObjects(fetchingId, fullData["k8s_objects"])
+
 	if err != nil {
 		return fmt.Errorf("failed sending objects to Infralight: %w", err)
+	}
+
+	err = f.sendHelmReleases(fetchingId, fullData["helm_releases"], fullData["k8s_types"])
+
+	if err != nil {
+		return fmt.Errorf("failed sending releases to Infralight: %w", err)
 	}
 
 	return nil
@@ -184,4 +191,103 @@ func (f *Collector) send(data map[string]interface{}) error {
 		ExpectedStatus(http.StatusNoContent).
 		JSONBody(data).
 		Run()
+}
+
+func (f *Collector) sendK8sObjects(fetchingId string, data []interface{}) error {
+	if len(data) == 0 {
+		f.conf.Log.Warn().
+			Str("FetchingId", fetchingId).
+			Msg("No k8s objects to send to Infralight")
+		return nil
+	}
+	f.conf.Log.Debug().
+		Int("MessageSize", len(data)).
+		Msg("Sending collected data to Infralight")
+
+	page := 0
+	totalBytes := 0
+	var objects []interface{}
+	for idx, obj := range data {
+		bytes, _ := json.Marshal(obj)
+		totalBytes += len(bytes)
+		objects = append(objects, obj)
+		if totalBytes > f.conf.PageSize*1000 || idx == len(data)-1 {
+			body := make(map[string]interface{}, 2)
+			body["fetchingId"] = fetchingId
+			body["k8sObjects"] = objects
+			err := requests.NewClient(f.conf.Endpoint).
+				Header("Authorization", fmt.Sprintf("Bearer %s", f.accessToken)).
+				NewRequest("POST", fmt.Sprintf("/integrations/k8s/%s/objects", f.clusterID)).
+				CompressWith(requests.CompressionAlgorithmGzip).
+				ExpectedStatus(http.StatusNoContent).
+				JSONBody(body).
+				Run()
+			if err != nil {
+				log.Err(err).Str("ClusterId", f.clusterID).Int("Page", page).
+					Int("ResourcesInPage", len(objects)).Int("PageMessageSize", totalBytes).
+					Msg("Error sending resources to server")
+				return err
+			}
+			log.Debug().Str("ClusterId", f.clusterID).Int("Page", page).
+				Int("ResourcesInPage", len(objects)).Int("PageMessageSize", totalBytes).
+				Msg("Send k8s objects page successfully")
+			objects = []interface{}{}
+		}
+	}
+	log.Info().
+		Str("FetchingId", fetchingId).
+		Int("MessageSize", len(data)).
+		Msg("Send helm releases successfully")
+	return nil
+}
+
+func (f *Collector) sendHelmReleases(fetchingId string, data []interface{}, types []interface{}) error {
+	if len(data) == 0 {
+		f.conf.Log.Warn().
+			Str("FetchingId", fetchingId).
+			Msg("No helm releases to send to Infralight")
+		return nil
+	}
+	f.conf.Log.Debug().
+		Str("FetchingId", fetchingId).
+		Int("MessageSize", len(data)).
+		Msg("Sending collected helm releases to Infralight")
+
+	page := 0
+	totalBytes := 0
+	var objects []interface{}
+	for idx, obj := range data {
+		bytes, _ := json.Marshal(obj)
+		totalBytes += len(bytes)
+		objects = append(objects, obj)
+
+		if totalBytes+len(bytes) > f.conf.PageSize*1000 || idx == len(data)-1 {
+			body := make(map[string]interface{}, 3)
+			body["fetchingId"] = fetchingId
+			body["helmReleases"] = objects
+			body["k8sTypes"] = types
+			err := requests.NewClient(f.conf.Endpoint).
+				Header("Authorization", fmt.Sprintf("Bearer %s", f.accessToken)).
+				NewRequest("POST", fmt.Sprintf("/integrations/k8s/%s/helm", f.clusterID)).
+				CompressWith(requests.CompressionAlgorithmGzip).
+				ExpectedStatus(http.StatusNoContent).
+				JSONBody(body).
+				Run()
+			if err != nil {
+				log.Err(err).Str("ClusterId", f.clusterID).Int("Page", page).
+					Int("ResourcesInPage", len(objects)).Int("PageMessageSize", totalBytes).
+					Msg("Error sending resources to server")
+				return err
+			}
+			log.Debug().Str("ClusterId", f.clusterID).Int("Page", page).
+				Int("ResourcesInPage", len(objects)).Int("PageMessageSize", totalBytes).
+				Msg("Send helm releases page successfully")
+			objects = []interface{}{}
+		}
+	}
+	log.Info().
+		Str("FetchingId", fetchingId).
+		Int("MessageSize", len(data)).
+		Msg("Send helm releases successfully")
+	return nil
 }

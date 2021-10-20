@@ -109,6 +109,8 @@ type Config struct {
 	FetchClusterRoles bool
 	// OverrideUniqueClusterId is a boolean indicating whether to override the master url of the Kubernetes integration
 	OverrideUniqueClusterId bool
+	// PageSize is an integer for max page size in KB
+	PageSize int
 }
 
 // LoadConfig creates a new configuration object. A logger object, a file-system
@@ -176,6 +178,7 @@ func LoadConfig(
 	conf.FetchIngresses = parseBool(conf.etcConfig("collector.resources.ingresses"), true)
 	conf.FetchClusterRoles = parseBool(conf.etcConfig("collector.resources.clusterRoles"), true)
 	conf.OverrideUniqueClusterId = parseBool(conf.etcConfig("collector.OverrideUniqueClusterId"), false)
+	conf.PageSize = parseInt(conf.etcConfig("collector.PageSize"), 500)
 
 	return conf, nil
 }
@@ -201,6 +204,15 @@ func parseOne(str, defVal string) string {
 	}
 
 	return str
+}
+
+func parseInt(str string, defVal int) int {
+	str = strings.TrimSpace(str)
+	asInt, err := strconv.Atoi(str)
+	if err != nil {
+		return defVal
+	}
+	return asInt
 }
 
 func parseMultiple(str string, defVal []string) []string {
