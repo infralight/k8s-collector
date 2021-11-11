@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"github.com/infralight/k8s-collector/collector/k8stree"
 	"net/http"
 	"regexp"
 
@@ -130,6 +131,18 @@ func (f *Collector) Run(ctx context.Context) (err error) {
 		return fmt.Errorf("failed sending releases to Infralight: %w", err)
 	}
 
+	k8sTree, err := k8stree.GetK8sTree(fullData["k8s_objects"])
+
+	if err != nil {
+		return fmt.Errorf("failed getting k8s objects tree: %w", err)
+	}
+
+	err = f.sendK8sTree(fetchingId, k8sTree)
+
+	if err != nil {
+		return fmt.Errorf("failed sending k8s objects tree to Infralight: %w", err)
+	}
+
 	return nil
 }
 
@@ -239,7 +252,7 @@ func (f *Collector) sendK8sObjects(fetchingId string, data []interface{}) error 
 	log.Info().
 		Str("FetchingId", fetchingId).
 		Int("Resources", len(data)).
-		Msg("Sent helm releases successfully")
+		Msg("Sent k8s objects page successfully")
 	return nil
 }
 
@@ -293,5 +306,55 @@ func (f *Collector) sendHelmReleases(fetchingId string, data []interface{}, type
 		Str("FetchingId", fetchingId).
 		Int("Resources", len(data)).
 		Msg("Sent all helm releases successfully")
+	return nil
+}
+
+func (f *Collector) sendK8sTree(fetchingId string, data []*k8stree.ObjectsTree) error {
+	if len(data) == 0 {
+		f.conf.Log.Warn().
+			Str("FetchingId", fetchingId).
+			Msg("No k8s objects trees to send to Infralight")
+		return nil
+	}
+	f.conf.Log.Debug().
+		Int("MessageSize", len(data)).
+		Msg("Sending collected data to Infralight")
+
+	page := 0
+	totalBytes := 0
+	var objectsTrees []interface{}
+	for idx, tree := range data {
+		bytes, _ := json.Marshal(tree)
+		totalBytes += len(bytes)
+		objectsTrees = append(objectsTrees, tree)
+		if totalBytes > f.conf.PageSize*1000 || idx == len(data)-1 {
+			page += 1
+			body := make(map[string]interface{}, 2)
+			body["fetchingId"] = fetchingId
+			body["k8sTree"] = objectsTrees
+			err := requests.NewClient(f.conf.Endpoint).
+				Header("Authorization", fmt.Sprintf("Bearer %s", f.accessToken)).
+				NewRequest("POST", fmt.Sprintf("/integrations/k8s/%s/fetching/tree", f.clusterID)).
+				CompressWith(requests.CompressionAlgorithmGzip).
+				ExpectedStatus(http.StatusNoContent).
+				JSONBody(body).
+				Run()
+			if err != nil {
+				log.Err(err).Str("ClusterId", f.clusterID).Int("Page", page).Str("FetchingId", fetchingId).
+					Int("ResourcesInPage", len(objectsTrees)).Int("PageMessageSize", totalBytes).
+					Msg("Error sending resources to server")
+				return err
+			}
+			log.Info().Str("ClusterId", f.clusterID).Int("Page", page).Str("FetchingId", fetchingId).
+				Int("ResourcesInPage", len(objectsTrees)).Int("PageMessageSize", totalBytes).
+				Msg("Sent k8s objects trees page successfully")
+			objectsTrees = []interface{}{}
+			totalBytes = 0
+		}
+	}
+	log.Info().
+		Str("FetchingId", fetchingId).
+		Int("Resources", len(data)).
+		Msg("Sent k8s objects trees page successfully")
 	return nil
 }
