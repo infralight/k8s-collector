@@ -331,7 +331,7 @@ func (f *Collector) sendK8sTree(fetchingId string, data []*k8stree.ObjectsTree) 
 			page += 1
 			body := make(map[string]interface{}, 2)
 			body["fetchingId"] = fetchingId
-			body["k8sTree"] = objectsTrees
+			body["k8sTrees"] = objectsTrees
 			err := requests.NewClient(f.conf.Endpoint).
 				Header("Authorization", fmt.Sprintf("Bearer %s", f.accessToken)).
 				NewRequest("POST", fmt.Sprintf("/integrations/k8s/%s/fetching/tree", f.clusterID)).
