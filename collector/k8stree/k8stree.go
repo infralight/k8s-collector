@@ -3,27 +3,26 @@ package k8stree
 import (
 	"github.com/infralight/k8s-collector/collector/k8s"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
-	"k8s.io/apimachinery/pkg/types"
 )
 
 type ObjectsTree struct {
-	children []*ObjectsTree
-	uid      types.UID
-	kind     string
-	object   unstructured.Unstructured
+	Children []ObjectsTree          `json:"children"`
+	UID      string                 `json:"uid"`
+	Kind     string                 `json:"kind"`
+	Object   map[string]interface{} `json:"object"`
 }
 
-func GetK8sTree(objects []interface{}) ([]*ObjectsTree, error) {
-	unstructuredObjects := make([]*unstructured.Unstructured, len(objects))
+func GetK8sTree(objects []interface{}) ([]ObjectsTree, error) {
+	unstructuredObjects := make([]unstructured.Unstructured, len(objects))
 	for i, obj := range objects {
-		unstructuredObjects[i] = &unstructured.Unstructured{
+		unstructuredObjects[i] = unstructured.Unstructured{
 			Object: obj.(k8s.KubernetesObject).Object.(map[string]interface{}),
 		}
 	}
 
 	sourceParents, remainingUnstructuredObjects := getSourceParents(unstructuredObjects)
-	var objectsTrees []*ObjectsTree
-	var sourceParentTree *ObjectsTree
+	var objectsTrees []ObjectsTree
+	var sourceParentTree ObjectsTree
 	for _, sourceParent := range sourceParents {
 		sourceParentTree, remainingUnstructuredObjects, _ = createTrees(sourceParent, remainingUnstructuredObjects)
 		objectsTrees = append(objectsTrees, sourceParentTree)
@@ -31,19 +30,19 @@ func GetK8sTree(objects []interface{}) ([]*ObjectsTree, error) {
 	return objectsTrees, nil
 }
 
-func getSourceParents(objects []*unstructured.Unstructured) (
-	[]*ObjectsTree, []*unstructured.Unstructured) {
-	sourceParents := make([]*ObjectsTree, 0)
-	remainingChildren := make([]*unstructured.Unstructured, 0)
+func getSourceParents(objects []unstructured.Unstructured) (
+	[]ObjectsTree, []unstructured.Unstructured) {
+	sourceParents := make([]ObjectsTree, 0)
+	remainingChildren := make([]unstructured.Unstructured, 0)
 
 	for _, obj := range objects {
 		objOwners := obj.GetOwnerReferences()
 
 		if len(objOwners) == 0 {
-			sourceParents = append(sourceParents, &ObjectsTree{
-				uid:    obj.GetUID(),
-				kind:   obj.GetKind(),
-				object: *obj,
+			sourceParents = append(sourceParents, ObjectsTree{
+				UID:    string(obj.GetUID()),
+				Kind:   obj.GetKind(),
+				Object: obj.Object,
 			})
 			continue
 		}
@@ -53,11 +52,12 @@ func getSourceParents(objects []*unstructured.Unstructured) (
 }
 
 // newObjectDirectory builds object lookup and hierarchy.
-func createTrees(objectsTree *ObjectsTree, objects []*unstructured.Unstructured) (
-	*ObjectsTree, []*unstructured.Unstructured, []*unstructured.Unstructured) {
-	foundChildren := make([]*unstructured.Unstructured, 0)
-	remainingChildren := make([]*unstructured.Unstructured, 0)
-	objChildren := make([]*unstructured.Unstructured, 0)
+func createTrees(objectsTree ObjectsTree, objects []unstructured.Unstructured) (
+	ObjectsTree, []unstructured.Unstructured, []unstructured.Unstructured) {
+	foundChildren := make([]unstructured.Unstructured, 0)
+	remainingChildren := make([]unstructured.Unstructured, 0)
+	objChildren := make([]unstructured.Unstructured, 0)
+	var childTree ObjectsTree
 
 	for _, obj := range objects {
 		isChild := false
@@ -66,14 +66,14 @@ func createTrees(objectsTree *ObjectsTree, objects []*unstructured.Unstructured)
 		}
 		ownerReference := obj.GetOwnerReferences()
 		for _, ownerRef := range ownerReference {
-			if ownerRef.UID == objectsTree.uid {
-				childObj := &ObjectsTree{
-					uid:    obj.GetUID(),
-					kind:   obj.GetKind(),
-					object: *obj,
+			if string(ownerRef.UID) == objectsTree.UID {
+				childObj := ObjectsTree{
+					UID:    string(obj.GetUID()),
+					Kind:   obj.GetKind(),
+					Object: obj.Object,
 				}
-				objectsTree.children = append(objectsTree.children, childObj)
-				_, remainingChildren, objChildren = createTrees(childObj, remainingChildren)
+				childTree, remainingChildren, objChildren = createTrees(childObj, remainingChildren)
+				objectsTree.Children = append(objectsTree.Children, childTree)
 				foundChildren = append(foundChildren, objChildren...)
 				isChild = true
 				break
@@ -88,7 +88,7 @@ func createTrees(objectsTree *ObjectsTree, objects []*unstructured.Unstructured)
 	return objectsTree, remainingChildren, foundChildren
 }
 
-func containsChild(children []*unstructured.Unstructured, child *unstructured.Unstructured) bool {
+func containsChild(children []unstructured.Unstructured, child unstructured.Unstructured) bool {
 	for _, someChild := range children {
 		if someChild.GetUID() == child.GetUID() {
 			return true

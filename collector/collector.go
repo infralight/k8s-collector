@@ -309,7 +309,7 @@ func (f *Collector) sendHelmReleases(fetchingId string, data []interface{}, type
 	return nil
 }
 
-func (f *Collector) sendK8sTree(fetchingId string, data []*k8stree.ObjectsTree) error {
+func (f *Collector) sendK8sTree(fetchingId string, data []k8stree.ObjectsTree) error {
 	if len(data) == 0 {
 		f.conf.Log.Warn().
 			Str("FetchingId", fetchingId).
