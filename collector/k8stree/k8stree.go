@@ -65,8 +65,15 @@ func createTrees(objectsTree ObjectsTree, objects []unstructured.Unstructured) (
 			continue
 		}
 		ownerReference := obj.GetOwnerReferences()
-		for _, ownerRef := range ownerReference {
+		for i, ownerRef := range ownerReference {
 			if string(ownerRef.UID) == objectsTree.UID {
+				if i == len(ownerReference)-1 {
+					ownerReference = ownerReference[:i]
+				} else {
+					ownerReference = append(ownerReference[:i], ownerReference[i+1:]...)
+				}
+				obj.SetOwnerReferences(ownerReference)
+
 				childObj := ObjectsTree{
 					UID:    string(obj.GetUID()),
 					Kind:   obj.GetKind(),
@@ -80,7 +87,7 @@ func createTrees(objectsTree ObjectsTree, objects []unstructured.Unstructured) (
 			}
 		}
 
-		if !isChild || len(ownerReference) > 1 {
+		if !isChild || len(ownerReference) != 0 {
 			remainingChildren = append(remainingChildren, obj)
 		}
 	}
