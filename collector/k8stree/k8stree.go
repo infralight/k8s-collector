@@ -27,7 +27,7 @@ func GetK8sTree(objects []interface{}) ([]ObjectsTree, error) {
 	var foundChildren []unstructured.Unstructured
 	for _, sourceParent := range sourceParents {
 		sourceParentTree, foundChildren = createTrees(sourceParent, remainingUnstructuredObjects)
-		remainingUnstructuredObjects = differenceUnstructuredObjects(remainingUnstructuredObjects, foundChildren)
+		remainingUnstructuredObjects = subtractUnstructuredObjects(remainingUnstructuredObjects, foundChildren)
 		objectsTrees = append(objectsTrees, sourceParentTree)
 	}
 	return objectsTrees, nil
@@ -64,13 +64,13 @@ func createTrees(objectsTree ObjectsTree, objects []unstructured.Unstructured) (
 		ownerReference := obj.GetOwnerReferences()
 		for _, ownerRef := range ownerReference {
 			if string(ownerRef.UID) == objectsTree.UID {
-				ownerReference = differenceOwnerReferences(ownerReference, []v1.OwnerReference{ownerRef})
+				ownerReference = subtractOwnerReferences(ownerReference, []v1.OwnerReference{ownerRef})
 				obj.SetOwnerReferences(ownerReference)
 
 				if len(ownerReference) == 0 {
 					foundChildren = append(foundChildren, obj)
 				}
-				remainingChildren := differenceUnstructuredObjects(objects, foundChildren)
+				remainingChildren := subtractUnstructuredObjects(objects, foundChildren)
 
 				childObj := ObjectsTree{
 					UID:    string(obj.GetUID()),
@@ -88,7 +88,7 @@ func createTrees(objectsTree ObjectsTree, objects []unstructured.Unstructured) (
 	return objectsTree, foundChildren
 }
 
-func differenceUnstructuredObjects(a, b []unstructured.Unstructured) []unstructured.Unstructured {
+func subtractUnstructuredObjects(a, b []unstructured.Unstructured) []unstructured.Unstructured {
 	mb := make(map[string]struct{}, len(b))
 	for _, x := range b {
 		mb[string(x.GetUID())] = struct{}{}
@@ -102,7 +102,7 @@ func differenceUnstructuredObjects(a, b []unstructured.Unstructured) []unstructu
 	return diff
 }
 
-func differenceOwnerReferences(a, b []v1.OwnerReference) []v1.OwnerReference {
+func subtractOwnerReferences(a, b []v1.OwnerReference) []v1.OwnerReference {
 	mb := make(map[string]struct{}, len(b))
 	for _, x := range b {
 		mb[string(x.UID)] = struct{}{}
