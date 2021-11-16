@@ -2,6 +2,7 @@ package k8stree
 
 import (
 	"github.com/infralight/k8s-collector/collector/k8s"
+	"github.com/thoas/go-funk"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 )
@@ -15,11 +16,11 @@ type ObjectsTree struct {
 
 func GetK8sTree(objects []interface{}) ([]ObjectsTree, error) {
 	unstructuredObjects := make([]unstructured.Unstructured, len(objects))
-	for i, obj := range objects {
-		unstructuredObjects[i] = unstructured.Unstructured{
+	funk.ForEach(objects, func(obj interface{}) {
+		unstructuredObjects = append(unstructuredObjects, unstructured.Unstructured{
 			Object: obj.(k8s.KubernetesObject).Object.(map[string]interface{}),
-		}
-	}
+		})
+	})
 
 	sourceParents, remainingUnstructuredObjects := getSourceParents(unstructuredObjects)
 	var objectsTrees []ObjectsTree
