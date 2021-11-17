@@ -7,6 +7,7 @@ require (
 	github.com/jgroeneveld/schema v1.0.0 // indirect
 	github.com/jgroeneveld/trial v2.0.0+incompatible
 	github.com/rs/zerolog v1.22.0
+	github.com/thoas/go-funk v0.9.1 // indirect
 	go.uber.org/multierr v1.6.0 // indirect
 	go.uber.org/zap v1.16.0 // indirect
 	gopkg.in/mgo.v2 v2.0.0-20190816093944-a6b53ec6cb22

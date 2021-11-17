@@ -153,7 +153,7 @@ func (f *Collector) Run(ctx context.Context, conf *config.Config) (
 			}
 			for _, item := range itemsDict.Items {
 				item["apiVersion"] = apiResource.GroupVersion
-				item["Kind"] = resource.Kind
+				item["kind"] = resource.Kind
 				objects = append(objects, KubernetesObject{
 					Kind:   resource.Kind,
 					Object: item,
