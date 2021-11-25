@@ -61,7 +61,7 @@ func (f *Collector) Run(ctx context.Context, conf *config.Config) (
 	log.Debug().Msg("Starting collect Kubernetes supported types")
 	var supportedResources []map[string]interface{}
 
-	apiGroups, err := f.api.Discovery().ServerPreferredResources()
+	_, apiGroups, err := f.api.Discovery().ServerGroupsAndResources()
 	if err != nil {
 		return "", nil, err
 	}
