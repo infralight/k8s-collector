@@ -1,10 +1,12 @@
 package k8stree
 
 import (
+	"fmt"
 	"github.com/infralight/k8s-collector/collector/k8s"
 	"github.com/thoas/go-funk"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"strings"
 )
 
 type ObjectsTree struct {
@@ -36,6 +38,12 @@ func GetK8sTree(objects []interface{}) ([]ObjectsTree, error) {
 
 func getSourceParents(objects []unstructured.Unstructured) (
 	[]ObjectsTree, []unstructured.Unstructured) {
+	services := make(map[string]unstructured.Unstructured, 0)
+	funk.ForEach(objects, func(obj unstructured.Unstructured) {
+		if strings.ToLower(obj.GetKind()) == "service" {
+			services[fmt.Sprintf("%s/%s", obj.GetNamespace(), obj.GetName())] = obj
+		}
+	})
 	sourceParents := make([]ObjectsTree, 0)
 	remainingChildren := make([]unstructured.Unstructured, 0)
 
@@ -43,6 +51,22 @@ func getSourceParents(objects []unstructured.Unstructured) (
 		objOwners := obj.GetOwnerReferences()
 
 		if len(objOwners) == 0 {
+			if obj.GetKind() == "Endpoints" {
+				service, ok := services[fmt.Sprintf("%s/%s", obj.GetNamespace(), obj.GetName())]
+				if ok {
+					objOwners = []v1.OwnerReference{
+						{
+							APIVersion: service.GetAPIVersion(),
+							Kind:       service.GetKind(),
+							Name:       service.GetName(),
+							UID:        service.GetUID(),
+						},
+					}
+					obj.SetOwnerReferences(objOwners)
+					remainingChildren = append(remainingChildren, obj)
+					continue
+				}
+			}
 			sourceParents = append(sourceParents, ObjectsTree{
 				UID:    string(obj.GetUID()),
 				Kind:   obj.GetKind(),
