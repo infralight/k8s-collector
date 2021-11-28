@@ -17,7 +17,7 @@ type ObjectsTree struct {
 }
 
 func GetK8sTree(objects []interface{}) ([]ObjectsTree, error) {
-	unstructuredObjects := make([]unstructured.Unstructured, len(objects))
+    var unstructuredObjects []unstructured.Unstructured
 	funk.ForEach(objects, func(obj interface{}) {
 		unstructuredObjects = append(unstructuredObjects, unstructured.Unstructured{
 			Object: obj.(k8s.KubernetesObject).Object.(map[string]interface{}),
