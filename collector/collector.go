@@ -256,14 +256,15 @@ func (f *Collector) sendK8sObjects(fetchingId string, data []interface{}) error 
     }).
         Run()
     if err != nil {
-        log.Err(err).Str("ClusterId", f.clusterID).Str("FetchingId", fetchingId).
-            Int("PageMessageSize", totalBytes).
+        log.Err(err).
+            Str("ClusterId", f.clusterID).
+            Str("FetchingId", fetchingId).
             Msg("Error sending LOCK")
         return err
     }
 	log.Info().
-		Str("FetchingId", fetchingId).
-		Int("Resources", len(data)).
+        Str("ClusterId", f.clusterID).
+        Str("FetchingId", fetchingId).
 		Msg("Sent LOCK successfully")
 	return nil
 }
