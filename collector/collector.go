@@ -237,10 +237,14 @@ func (f *Collector) sendK8sObjects(fetchingId string, data []interface{}) error 
 				JSONBody(body).
 				Run()
 			if err != nil {
-				log.Err(err).Str("ClusterId", f.clusterID).Str("FetchingId", fetchingId).Msg("Error sending resources to server")
+				log.Err(err).Str("ClusterId", f.clusterID).Int("Page", page).Str("FetchingId", fetchingId).
+					Int("ResourcesInPage", len(objects)).Int("PageMessageSize", totalBytes).
+					Msg("Error sending resources to server")
 				return err
 			}
-			log.Info().Str("ClusterId", f.clusterID).Int("Page", page).Str("FetchingId", fetchingId).Msg("Sent k8s objects page successfully")
+			log.Info().Str("ClusterId", f.clusterID).Int("Page", page).Str("FetchingId", fetchingId).
+				Int("ResourcesInPage", len(objects)).Int("PageMessageSize", totalBytes).
+				Msg("Sent k8s objects page successfully")
 			objects = []interface{}{}
 			totalBytes = 0
 		}
@@ -256,16 +260,10 @@ func (f *Collector) sendK8sObjects(fetchingId string, data []interface{}) error 
     }).
         Run()
     if err != nil {
-        log.Err(err).
-            Str("ClusterId", f.clusterID).
-            Str("FetchingId", fetchingId).
-            Msg("Error sending LOCK")
+        log.Err(err).Str("ClusterId", f.clusterID).Str("FetchingId", fetchingId).Msg("Error sending LOCK")
         return err
     }
-	log.Info().
-        Str("ClusterId", f.clusterID).
-        Str("FetchingId", fetchingId).
-		Msg("Sent LOCK successfully")
+	log.Info().Str("ClusterId", f.clusterID).Str("FetchingId", fetchingId).Msg("Sent LOCK successfully")
 	return nil
 }
 
