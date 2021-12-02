@@ -261,7 +261,6 @@ func (f *Collector) sendK8sObjects(fetchingId string, data []interface{}) error 
         Run()
     if err != nil {
         log.Err(err).Str("ClusterId", f.clusterID).Str("FetchingId", fetchingId).Msg("Error sending LOCK")
-        return err
     }
 	log.Info().Str("ClusterId", f.clusterID).Str("FetchingId", fetchingId).Msg("Sent LOCK successfully")
 	return nil
