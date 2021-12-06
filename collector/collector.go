@@ -249,10 +249,21 @@ func (f *Collector) sendK8sObjects(fetchingId string, data []interface{}) error 
 			totalBytes = 0
 		}
 	}
-	log.Info().
-		Str("FetchingId", fetchingId).
-		Int("Resources", len(data)).
-		Msg("Sent k8s objects page successfully")
+    err := requests.NewClient(f.conf.Endpoint).
+        Header("Authorization", fmt.Sprintf("Bearer %s", f.accessToken)).
+        NewRequest("LOCK", fmt.Sprintf("/integrations/k8s/%s/fetching", f.clusterID)).
+        CompressWith(requests.CompressionAlgorithmGzip).
+        ExpectedStatus(http.StatusNoContent).
+        JSONBody(map[string]interface{}{
+        "fetchingId": fetchingId,
+        "clusterId": f.clusterID,
+    }).
+        Run()
+    if err != nil {
+        log.Err(err).Str("ClusterId", f.clusterID).Str("FetchingId", fetchingId).Msg("Error sending LOCK")
+        return nil
+    }
+	log.Info().Str("ClusterId", f.clusterID).Str("FetchingId", fetchingId).Msg("Sent LOCK successfully")
 	return nil
 }
 
