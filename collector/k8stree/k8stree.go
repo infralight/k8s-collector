@@ -17,7 +17,7 @@ type ObjectsTree struct {
 }
 
 func GetK8sTree(objects []interface{}) ([]ObjectsTree, error) {
-    var unstructuredObjects []unstructured.Unstructured
+	var unstructuredObjects []unstructured.Unstructured
 	funk.ForEach(objects, func(obj interface{}) {
 		unstructuredObjects = append(unstructuredObjects, unstructured.Unstructured{
 			Object: obj.(k8s.KubernetesObject).Object.(map[string]interface{}),
@@ -38,12 +38,7 @@ func GetK8sTree(objects []interface{}) ([]ObjectsTree, error) {
 
 func getSourceParents(objects []unstructured.Unstructured) (
 	[]ObjectsTree, []unstructured.Unstructured) {
-	services := make(map[string]unstructured.Unstructured, 0)
-	funk.ForEach(objects, func(obj unstructured.Unstructured) {
-		if strings.ToLower(obj.GetKind()) == "service" {
-			services[fmt.Sprintf("%s/%s", obj.GetNamespace(), obj.GetName())] = obj
-		}
-	})
+	specialParents := getSpecialParents(objects, []string{"Service", "StatefulSet", "PersistentVolumeClaim"})
 	sourceParents := make([]ObjectsTree, 0)
 	remainingChildren := make([]unstructured.Unstructured, 0)
 
@@ -51,22 +46,13 @@ func getSourceParents(objects []unstructured.Unstructured) (
 		objOwners := obj.GetOwnerReferences()
 
 		if len(objOwners) == 0 {
-			if obj.GetKind() == "Endpoints" {
-				service, ok := services[fmt.Sprintf("%s/%s", obj.GetNamespace(), obj.GetName())]
-				if ok {
-					objOwners = []v1.OwnerReference{
-						{
-							APIVersion: service.GetAPIVersion(),
-							Kind:       service.GetKind(),
-							Name:       service.GetName(),
-							UID:        service.GetUID(),
-						},
-					}
-					obj.SetOwnerReferences(objOwners)
-					remainingChildren = append(remainingChildren, obj)
-					continue
-				}
+			isSpecialChildren, newObjOwners := specialChildren(obj, specialParents)
+			if isSpecialChildren {
+				obj.SetOwnerReferences(newObjOwners)
+				remainingChildren = append(remainingChildren, obj)
+				continue
 			}
+
 			sourceParents = append(sourceParents, ObjectsTree{
 				UID:    string(obj.GetUID()),
 				Kind:   obj.GetKind(),
@@ -77,6 +63,83 @@ func getSourceParents(objects []unstructured.Unstructured) (
 		remainingChildren = append(remainingChildren, obj)
 	}
 	return sourceParents, remainingChildren
+}
+
+func specialChildren(obj unstructured.Unstructured, specialParents map[string]map[string]unstructured.Unstructured) (bool, []v1.OwnerReference) {
+	switch obj.GetKind() {
+	case "Endpoints":
+		service, ok := specialParents["Service"][fmt.Sprintf("%s/%s", obj.GetNamespace(), obj.GetName())]
+		if ok {
+			return true, []v1.OwnerReference{
+				{
+					APIVersion: service.GetAPIVersion(),
+					Kind:       service.GetKind(),
+					Name:       service.GetName(),
+					UID:        service.GetUID(),
+				},
+			}
+		}
+	case "PersistentVolume":
+		persistentVolumeClaim, ok := specialParents["PersistentVolumeClaim"][fmt.Sprintf("%s", obj.GetName())]
+		if ok {
+			return true, []v1.OwnerReference{
+				{
+					APIVersion: persistentVolumeClaim.GetAPIVersion(),
+					Kind:       persistentVolumeClaim.GetKind(),
+					Name:       persistentVolumeClaim.GetName(),
+					UID:        persistentVolumeClaim.GetUID(),
+				},
+			}
+		}
+	case "PersistentVolumeClaim":
+		pvcSplitName := strings.Split(obj.GetName(), "-")
+		if len(pvcSplitName) == 1 {
+			break
+		}
+
+		pvcNameWithoutIndex := strings.Join(pvcSplitName[:len(pvcSplitName)-1], "-")
+		statefulSet := funk.Find(specialParents["StatefulSet"], func(statefulSet unstructured.Unstructured) bool {
+			if obj.GetNamespace() == statefulSet.GetNamespace() &&
+				strings.HasSuffix(pvcNameWithoutIndex, statefulSet.GetName()) {
+				return true
+			}
+			return false
+		})
+
+		if statefulSet != nil {
+			statefulSetUnstructured := statefulSet.(unstructured.Unstructured)
+			return true, []v1.OwnerReference{
+				{
+					APIVersion: statefulSetUnstructured.GetAPIVersion(),
+					Kind:       statefulSetUnstructured.GetKind(),
+					Name:       statefulSetUnstructured.GetName(),
+					UID:        statefulSetUnstructured.GetUID(),
+				},
+			}
+		}
+	}
+
+	return false, nil
+}
+
+func getSpecialParents(objects []unstructured.Unstructured, specialParentsKind []string) map[string]map[string]unstructured.Unstructured {
+	specialParents := make(map[string]map[string]unstructured.Unstructured)
+	funk.ForEach(objects, func(obj unstructured.Unstructured) {
+		if funk.ContainsString(specialParentsKind, obj.GetKind()) {
+			if specialParents[obj.GetKind()] == nil {
+				specialParents[obj.GetKind()] = make(map[string]unstructured.Unstructured)
+			}
+
+			switch obj.GetKind() {
+			case "PersistentVolumeClaim":
+				specialParents[obj.GetKind()][fmt.Sprintf("pvc-%s", obj.GetUID())] = obj
+			default:
+				specialParents[obj.GetKind()][fmt.Sprintf("%s/%s", obj.GetNamespace(), obj.GetName())] = obj
+			}
+		}
+	})
+
+	return specialParents
 }
 
 func createTrees(objectsTree ObjectsTree, objects []unstructured.Unstructured) (
