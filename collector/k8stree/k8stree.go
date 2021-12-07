@@ -80,7 +80,7 @@ func specialChildren(obj unstructured.Unstructured, specialParents map[string]ma
 			}
 		}
 	case "PersistentVolume":
-		persistentVolumeClaim, ok := specialParents["PersistentVolumeClaim"][fmt.Sprintf("%s/%s", obj.GetNamespace(), obj.GetName())]
+		persistentVolumeClaim, ok := specialParents["PersistentVolumeClaim"][fmt.Sprintf("%s", obj.GetName())]
 		if ok {
 			return true, []v1.OwnerReference{
 				{
@@ -104,15 +104,16 @@ func specialChildren(obj unstructured.Unstructured, specialParents map[string]ma
 				return true
 			}
 			return false
-		}).(unstructured.Unstructured)
+		})
 
-		if statefulSet.Object != nil {
+		if statefulSet != nil {
+			statefulSetUnstructured := statefulSet.(unstructured.Unstructured)
 			return true, []v1.OwnerReference{
 				{
-					APIVersion: statefulSet.GetAPIVersion(),
-					Kind:       statefulSet.GetKind(),
-					Name:       statefulSet.GetName(),
-					UID:        statefulSet.GetUID(),
+					APIVersion: statefulSetUnstructured.GetAPIVersion(),
+					Kind:       statefulSetUnstructured.GetKind(),
+					Name:       statefulSetUnstructured.GetName(),
+					UID:        statefulSetUnstructured.GetUID(),
 				},
 			}
 		}
@@ -121,8 +122,8 @@ func specialChildren(obj unstructured.Unstructured, specialParents map[string]ma
 	return false, nil
 }
 
-func getSpecialParents(objects []unstructured.Unstructured, specialParentsKind []string) (
-	specialParents map[string]map[string]unstructured.Unstructured) {
+func getSpecialParents(objects []unstructured.Unstructured, specialParentsKind []string) map[string]map[string]unstructured.Unstructured {
+	specialParents := make(map[string]map[string]unstructured.Unstructured)
 	funk.ForEach(specialParentsKind, func(specialParentKind string) {
 		specialParents[specialParentKind] = getAssetsByKind(objects, specialParentKind)
 	})
@@ -136,7 +137,7 @@ func getAssetsByKind(objects []unstructured.Unstructured, assetKind string) map[
 		if obj.GetKind() == assetKind {
 			switch assetKind {
 			case "PersistentVolumeClaim":
-				assets[fmt.Sprintf("%s/pvc-%s", obj.GetNamespace(), obj.GetUID())] = obj
+				assets[fmt.Sprintf("pvc-%s", obj.GetUID())] = obj
 			default:
 				assets[fmt.Sprintf("%s/%s", obj.GetNamespace(), obj.GetName())] = obj
 			}
