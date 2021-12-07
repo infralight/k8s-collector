@@ -124,27 +124,22 @@ func specialChildren(obj unstructured.Unstructured, specialParents map[string]ma
 
 func getSpecialParents(objects []unstructured.Unstructured, specialParentsKind []string) map[string]map[string]unstructured.Unstructured {
 	specialParents := make(map[string]map[string]unstructured.Unstructured)
-	funk.ForEach(specialParentsKind, func(specialParentKind string) {
-		specialParents[specialParentKind] = getAssetsByKind(objects, specialParentKind)
-	})
-
-	return specialParents
-}
-
-func getAssetsByKind(objects []unstructured.Unstructured, assetKind string) map[string]unstructured.Unstructured {
-	assets := make(map[string]unstructured.Unstructured, 0)
 	funk.ForEach(objects, func(obj unstructured.Unstructured) {
-		if obj.GetKind() == assetKind {
-			switch assetKind {
+		if funk.ContainsString(specialParentsKind, obj.GetKind()) {
+			if specialParents[obj.GetKind()] == nil {
+				specialParents[obj.GetKind()] = make(map[string]unstructured.Unstructured)
+			}
+
+			switch obj.GetKind() {
 			case "PersistentVolumeClaim":
-				assets[fmt.Sprintf("pvc-%s", obj.GetUID())] = obj
+				specialParents[obj.GetKind()][fmt.Sprintf("pvc-%s", obj.GetUID())] = obj
 			default:
-				assets[fmt.Sprintf("%s/%s", obj.GetNamespace(), obj.GetName())] = obj
+				specialParents[obj.GetKind()][fmt.Sprintf("%s/%s", obj.GetNamespace(), obj.GetName())] = obj
 			}
 		}
 	})
 
-	return assets
+	return specialParents
 }
 
 func createTrees(objectsTree ObjectsTree, objects []unstructured.Unstructured) (
