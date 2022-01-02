@@ -251,7 +251,7 @@ func (f *Collector) sendK8sObjects(fetchingId string, data []interface{}) error 
 	}
     err := requests.NewClient(f.conf.Endpoint).
         Header("Authorization", fmt.Sprintf("Bearer %s", f.accessToken)).
-        NewRequest("LOCK", fmt.Sprintf("/integrations/k8s/%s/fetching", f.clusterID)).
+        NewRequest("PATCH", fmt.Sprintf("/integrations/k8s/%s/fetching", f.clusterID)).
         CompressWith(requests.CompressionAlgorithmGzip).
         ExpectedStatus(http.StatusNoContent).
         JSONBody(map[string]interface{}{
