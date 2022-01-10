@@ -58,6 +58,9 @@ type Config struct {
 	// SecretKey is the Infralight secret key
 	SecretKey string
 
+    // UseSpecificRoute is a URL to override the firefly URL
+    UseSpecificRoute string
+
 	// Endpoint is the URL to the Infralight App Server
 	Endpoint string
 
@@ -149,10 +152,12 @@ func LoadConfig(
 		Log:       log,
 	}
 
-	conf.Endpoint = strings.TrimSuffix(parseOne(conf.etcConfig("endpoint"), ""), "/")
-	if conf.Endpoint == "" {
-		return conf, ErrEndpoint
-	}
+    conf.UseSpecificRoute = strings.TrimSuffix(parseOne(conf.etcConfig("useSpecificRoute"), ""), "/")
+    if conf.UseSpecificRoute == "" {
+        conf.Endpoint = "https://prod.external.api.infralight.cloud"
+    } else {
+        conf.Endpoint = conf.UseSpecificRoute
+    }
 
 	conf.AccessKey = accessKey
 	conf.SecretKey = secretKey
