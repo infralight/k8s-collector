@@ -92,7 +92,8 @@ func (f *Collector) Run(ctx context.Context) (err error) {
 	if !clusterIDRegex.MatchString(f.clusterID) {
 		return fmt.Errorf("invalid cluster ID, must match %s", clusterIDRegex)
 	}
-	log.Debug().Msg("Authenticating to Infralight App Server")
+	log.Info().Str("Infralight Endpoint", f.conf.Endpoint).Msg("Starting")
+
 	// authenticate with the Infralight API
 	f.accessToken, err = f.authenticate()
 	if err != nil {
