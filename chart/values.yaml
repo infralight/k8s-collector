@@ -7,7 +7,7 @@ secretKey: null
 
 image:
   repository: infralightio/k8s-collector
-  pullPolicy: Always
+  pullPolicy: IfNotPresent
 
 serviceAccount:
   name: "infralight-service-account"
