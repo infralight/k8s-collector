@@ -120,11 +120,6 @@ func (f *Collector) Run(ctx context.Context) (err error) {
 		fullData[keyName] = data
 	}
 	log.Debug().Msg("Sending data to Infralight App Server")
-	err = f.sendK8sObjects(fetchingId, fullData["k8s_objects"])
-
-	if err != nil {
-		return fmt.Errorf("failed sending objects to Infralight: %w", err)
-	}
 
 	err = f.sendHelmReleases(fetchingId, fullData["helm_releases"], fullData["k8s_types"])
 
@@ -143,6 +138,12 @@ func (f *Collector) Run(ctx context.Context) (err error) {
 	if err != nil {
 		return fmt.Errorf("failed sending k8s objects tree to Infralight: %w", err)
 	}
+
+    err = f.sendK8sObjects(fetchingId, fullData["k8s_objects"])
+
+    if err != nil {
+        return fmt.Errorf("failed sending objects to Infralight: %w", err)
+    }
 
 	return nil
 }
