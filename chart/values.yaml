@@ -16,7 +16,7 @@ serviceAccount:
 clusterRole:
   name: "infralight-role"
 
-reousrces:
+resources:
   requests:
     cpu: "1.0"
     memory: "512Mi"
