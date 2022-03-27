@@ -3,12 +3,12 @@ entries:
   infralight-k8s-collector:
   - apiVersion: v2
     appVersion: 1.0.0
-    created: "2022-03-27T17:38:39.116692+03:00"
+    created: "2022-03-27T17:47:44.068104+03:00"
     description: Infralight's Kubernetes Collector
-    digest: c6d91fe583a97c91d7c23aaed804619478efb19406e3be55d4a055a943cfa2cf
+    digest: 9ef850b28bdc45e1c4f6cca5dce452beb30b61374825066a33070ad10fff3e8f
     name: infralight-k8s-collector
     type: application
     urls:
     - https://infralight.github.io/k8s-collector/infralight-k8s-collector-1.0.0.tgz
     version: 1.0.0
-generated: "2022-03-27T17:38:39.1156+03:00"
+generated: "2022-03-27T17:47:44.067246+03:00"
