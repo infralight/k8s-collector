@@ -96,6 +96,9 @@ func (f *Collector) Run(ctx context.Context, conf *config.Config) (
 		"PersistentVolumeClaim": conf.FetchPersistentVolumeClaims,
 		"PersistentVolume":      conf.FetchPersistentVolumes,
 		"Pod":                   conf.FetchPods,
+		"ComponentStatus":       conf.FetchComponentStatuses,
+		"FlowSchema":            conf.FetchFlowSchemas,
+		"PodMetrics":            conf.FetchPodMetrics,
 	}
 
 	apiResourcesList, err := f.api.Discovery().ServerPreferredResources()

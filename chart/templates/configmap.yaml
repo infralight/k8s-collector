@@ -24,6 +24,9 @@ data:
   collector.resources.cronJobs: "true"
   collector.resources.ingresses: "true"
   collector.resources.clusterRoles: "true"
+  collector.resources.componentStatuses: "false"
+  collector.resources.flowSchemas: "false"
+  collector.resources.podMetrics: "false"
 {{- if .Values.collectEvents}}
   collector.resources.events: "true"
 {{- else }}

@@ -24,7 +24,6 @@ resources:
     cpu: "1.0"
     memory: "2048Mi"
 
-unsupportedResources: "FlowSchema,ComponentStatus,PodMetrics"
 collectSecrets: false
 collectEvents: false
 overrideUniqueClusterId: false
