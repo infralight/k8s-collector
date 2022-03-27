@@ -24,6 +24,7 @@ reousrces:
     cpu: "1.0"
     memory: "1024Mi"
 
+unsupportedResources: "FlowSchema,ComponentStatus"
 collectSecrets: false
 collectEvents: false
 overrideUniqueClusterId: false
