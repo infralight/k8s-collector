@@ -31,8 +31,8 @@ spec:
                   mountPath: /etc/config
           resources:
             requests:
-              cpu: { { .Values.reousrces.requests.cpu } }
-              memory: { { .Values.reousrces.requests.memory } }
+              cpu: {{ .Values.reousrces.requests.cpu }}
+              memory: {{ .Values.reousrces.requests.memory }}
             limits:
               cpu: {{ .Values.reousrces.limits.cpu }}
               memory: {{ .Values.reousrces.limits.memory }}
