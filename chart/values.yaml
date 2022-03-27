@@ -16,6 +16,14 @@ serviceAccount:
 clusterRole:
   name: "infralight-role"
 
+reousrces:
+  requests:
+    cpu: "1.0"
+    memory: "512Mi"
+  limits:
+    cpu: "1.0"
+    memory: "1024Mi"
+
 collectSecrets: false
 collectEvents: false
 overrideUniqueClusterId: false
