@@ -29,6 +29,13 @@ spec:
               volumeMounts:
                 - name: config-volume
                   mountPath: /etc/config
+          resources:
+            requests:
+              cpu: { { .Values.reousrces.requests.cpu } }
+              memory: { { .Values.reousrces.requests.memory } }
+            limits:
+              cpu: {{ .Values.reousrces.limits.cpu }}
+              memory: {{ .Values.reousrces.limits.memory }}
           volumes:
             - name: config-volume
               configMap:
