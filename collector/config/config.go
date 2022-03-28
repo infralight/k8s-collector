@@ -108,6 +108,12 @@ type Config struct {
 	FetchCronJobs bool
 	// FetchIngresses is a boolean indicating whether to collect Kubernetes Ingresses
 	FetchIngresses bool
+	// FetchFlowSchemas is a boolean indicating whether to collect Kubernetes FlowSchemas
+	FetchFlowSchemas bool
+	// FetchComponentStatuses is a boolean indicating whether to collect Kubernetes ComponentStatuses
+	FetchComponentStatuses bool
+	// FetchPodMetrics is a boolean indicating whether to collect Kubernetes PodMetrics
+	FetchPodMetrics bool
 	// FetchClusterRoles is a boolean indicating whether to collect Kubernetes ClusterRoles
 	FetchClusterRoles bool
 	// OverrideUniqueClusterId is a boolean indicating whether to override the master url of the Kubernetes integration
@@ -181,6 +187,9 @@ func LoadConfig(
 	conf.FetchJobs = parseBool(conf.etcConfig("collector.resources.jobs"), true)
 	conf.FetchCronJobs = parseBool(conf.etcConfig("collector.resources.cronJobs"), true)
 	conf.FetchIngresses = parseBool(conf.etcConfig("collector.resources.ingresses"), true)
+	conf.FetchComponentStatuses = parseBool(conf.etcConfig("collector.resources.componentStatuses"), false)
+	conf.FetchFlowSchemas = parseBool(conf.etcConfig("collector.resources.flowSchemas"), false)
+	conf.FetchPodMetrics = parseBool(conf.etcConfig("collector.resources.podMetrics"), false)
 	conf.FetchClusterRoles = parseBool(conf.etcConfig("collector.resources.clusterRoles"), true)
 	conf.OverrideUniqueClusterId = parseBool(conf.etcConfig("collector.OverrideUniqueClusterId"), false)
 	conf.PageSize = parseInt(conf.etcConfig("collector.PageSize"), 500)
