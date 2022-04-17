@@ -27,3 +27,4 @@ resources:
 collectSecrets: false
 collectEvents: false
 overrideUniqueClusterId: false
+fetchEverything: true
