@@ -2,6 +2,8 @@ kind: ClusterRole
 apiVersion: rbac.authorization.k8s.io/v1
 metadata:
   name: {{ .Values.clusterRole.name }}
+
+{{- if or .Values.fetchEverything .Values.secrets }}
 rules:
   - verbs:
       - get
@@ -11,3 +13,41 @@ rules:
       - '*'
     resources:
       - '*'
+{{- else }}
+rules:
+  - apiGroups:
+      - clusterroles
+      - ingresses
+      - networkpolicies
+      - daemonsets
+      - deployments
+      - replicasets
+      - cronjobs
+      - jobs
+      - statefulsets
+      - namespaces
+      - nodes
+      - events
+      - services/status
+      - services
+      - serviceaccounts
+      - replicationcontrollers
+      - pods
+      - persistentvolumeclaims
+      - persistentvolumes
+      - configmaps
+      - endpoints
+      - storageclasses
+      - customresourcedefinitions
+      - rollouts
+      - rollouts/status
+      - rollouts/finalizers
+      - analysistemplates
+      - clusteranalysistemplates
+    verbs:
+      - get
+      - list
+      - watch
+    resources:
+      - '*'
+{{- end }}
