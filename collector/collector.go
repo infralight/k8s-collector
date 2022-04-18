@@ -18,6 +18,10 @@ import (
 	"github.com/infralight/k8s-collector/collector/config"
 )
 
+const (
+	MaxItemSize = 1024 * 1500
+)
+
 // DataCollector is an interface for objects that collect data from K8s-related
 // components such as the Kubernetes API Server or Helm
 type DataCollector interface {
@@ -139,11 +143,11 @@ func (f *Collector) Run(ctx context.Context) (err error) {
 		return fmt.Errorf("failed sending k8s objects tree to Infralight: %w", err)
 	}
 
-    err = f.sendK8sObjects(fetchingId, fullData["k8s_objects"])
+	err = f.sendK8sObjects(fetchingId, fullData["k8s_objects"])
 
-    if err != nil {
-        return fmt.Errorf("failed sending objects to Infralight: %w", err)
-    }
+	if err != nil {
+		return fmt.Errorf("failed sending objects to Infralight: %w", err)
+	}
 
 	return nil
 }
@@ -251,20 +255,20 @@ func (f *Collector) sendK8sObjects(fetchingId string, data []interface{}) error 
 			totalBytes = 0
 		}
 	}
-    err := requests.NewClient(f.conf.Endpoint).
-        Header("Authorization", fmt.Sprintf("Bearer %s", f.accessToken)).
-        NewRequest("PATCH", fmt.Sprintf("/integrations/k8s/%s/fetching", f.clusterID)).
-        CompressWith(requests.CompressionAlgorithmGzip).
-        ExpectedStatus(http.StatusNoContent).
-        JSONBody(map[string]interface{}{
-        "fetchingId": fetchingId,
-        "clusterId": f.clusterID,
-    }).
-        Run()
-    if err != nil {
-        log.Err(err).Str("ClusterId", f.clusterID).Str("FetchingId", fetchingId).Msg("Error sending LOCK")
-        return nil
-    }
+	err := requests.NewClient(f.conf.Endpoint).
+		Header("Authorization", fmt.Sprintf("Bearer %s", f.accessToken)).
+		NewRequest("PATCH", fmt.Sprintf("/integrations/k8s/%s/fetching", f.clusterID)).
+		CompressWith(requests.CompressionAlgorithmGzip).
+		ExpectedStatus(http.StatusNoContent).
+		JSONBody(map[string]interface{}{
+			"fetchingId": fetchingId,
+			"clusterId":  f.clusterID,
+		}).
+		Run()
+	if err != nil {
+		log.Err(err).Str("ClusterId", f.clusterID).Str("FetchingId", fetchingId).Msg("Error sending LOCK")
+		return nil
+	}
 	log.Info().Str("ClusterId", f.clusterID).Str("FetchingId", fetchingId).Msg("Sent LOCK successfully")
 	return nil
 }
@@ -337,7 +341,34 @@ func (f *Collector) sendK8sTree(fetchingId string, data []k8stree.ObjectsTree) e
 	totalBytes := 0
 	var objectsTrees []interface{}
 	for idx, tree := range data {
-		bytes, _ := json.Marshal(tree)
+		name := tree.Name
+		tree.Name = ""
+		if tree.Children == nil || len(tree.Children) == 0 {
+			f.conf.Log.Debug().
+				Int("children", len(tree.Children)).
+				Str("kind", tree.Kind).
+				Str("name", name).
+				Msg("skipping empty tree")
+			continue
+		}
+		bytes, err := json.Marshal(tree)
+		if err != nil {
+			f.conf.Log.Err(err).
+				Int("children", len(tree.Children)).
+				Str("kind", tree.Kind).
+				Str("name", name).
+				Msg("failed to send tree")
+			continue
+		}
+		if len(bytes) > MaxItemSize {
+			f.conf.Log.Warn().
+				Int("children", len(tree.Children)).
+				Int("size", len(bytes)).
+				Str("kind", tree.Kind).
+				Str("name", name).
+				Msg("skipping massive tree")
+			continue
+		}
 		totalBytes += len(bytes)
 		objectsTrees = append(objectsTrees, tree)
 		if totalBytes > f.conf.PageSize*1000 || idx == len(data)-1 {

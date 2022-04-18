@@ -13,6 +13,7 @@ type ObjectsTree struct {
 	Children []ObjectsTree          `json:"children"`
 	UID      string                 `json:"uid"`
 	Kind     string                 `json:"kind"`
+	Name     string                 `json:"name,omitempty"`
 	Object   map[string]interface{} `json:"object"`
 }
 
@@ -57,6 +58,7 @@ func getSourceParents(objects []unstructured.Unstructured) (
 				UID:    string(obj.GetUID()),
 				Kind:   obj.GetKind(),
 				Object: obj.Object,
+				Name:   obj.GetName(),
 			})
 			continue
 		}
@@ -164,6 +166,7 @@ func createTrees(objectsTree ObjectsTree, objects []unstructured.Unstructured) (
 					UID:    string(obj.GetUID()),
 					Kind:   obj.GetKind(),
 					Object: obj.Object,
+					Name:   obj.GetName(),
 				}
 				childTree, objChildren = createTrees(childObj, remainingChildren)
 				objectsTree.Children = append(objectsTree.Children, childTree)
