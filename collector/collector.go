@@ -227,9 +227,17 @@ func (f *Collector) sendK8sObjects(fetchingId string, data []interface{}) error 
 	totalBytes := 0
 	var objects []interface{}
 	for idx, obj := range data {
-		bytes, _ := json.Marshal(obj)
-		totalBytes += len(bytes)
-		objects = append(objects, obj)
+		bytes, err := json.Marshal(obj)
+		if err != nil {
+			f.conf.Log.Err(err).
+				Msg("failed to send resource")
+		} else if len(bytes) > MaxItemSize {
+			f.conf.Log.Warn().
+				Msg("skipping massive resource")
+		} else {
+			totalBytes += len(bytes)
+			objects = append(objects, obj)
+		}
 		if totalBytes > f.conf.PageSize*1000 || idx == len(data)-1 {
 			page += 1
 			body := make(map[string]interface{}, 2)
@@ -343,34 +351,31 @@ func (f *Collector) sendK8sTree(fetchingId string, data []k8stree.ObjectsTree) e
 	for idx, tree := range data {
 		name := tree.Name
 		tree.Name = ""
+		bytes, err := json.Marshal(tree)
 		if tree.Children == nil || len(tree.Children) == 0 {
 			f.conf.Log.Debug().
 				Int("children", len(tree.Children)).
 				Str("kind", tree.Kind).
 				Str("name", name).
 				Msg("skipping empty tree")
-			continue
-		}
-		bytes, err := json.Marshal(tree)
-		if err != nil {
+		} else if err != nil {
 			f.conf.Log.Err(err).
 				Int("children", len(tree.Children)).
 				Str("kind", tree.Kind).
 				Str("name", name).
 				Msg("failed to send tree")
-			continue
-		}
-		if len(bytes) > MaxItemSize {
+		} else if len(bytes) > MaxItemSize {
 			f.conf.Log.Warn().
 				Int("children", len(tree.Children)).
 				Int("size", len(bytes)).
 				Str("kind", tree.Kind).
 				Str("name", name).
 				Msg("skipping massive tree")
-			continue
+		} else {
+			totalBytes += len(bytes)
+			objectsTrees = append(objectsTrees, tree)
 		}
-		totalBytes += len(bytes)
-		objectsTrees = append(objectsTrees, tree)
+
 		if totalBytes > f.conf.PageSize*1000 || idx == len(data)-1 {
 			page += 1
 			body := make(map[string]interface{}, 2)
