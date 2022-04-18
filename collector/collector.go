@@ -344,7 +344,7 @@ func (f *Collector) sendK8sTree(fetchingId string, data []k8stree.ObjectsTree) e
 		name := tree.Name
 		tree.Name = ""
 		if tree.Children == nil || len(tree.Children) == 0 {
-			f.conf.Log.Warn().
+			f.conf.Log.Debug().
 				Int("children", len(tree.Children)).
 				Str("kind", tree.Kind).
 				Str("name", name).
