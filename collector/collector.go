@@ -99,16 +99,16 @@ func (f *Collector) Run(ctx context.Context) (err error) {
 	log.Info().Str("Firefly Endpoint", f.conf.Endpoint).Msg("Starting")
 
 	// authenticate with the Infralight API
-	//f.accessToken, err = f.authenticate()
+	f.accessToken, err = f.authenticate()
 	if err != nil {
 		return fmt.Errorf("failed authenticating with Infralight API: %w", err)
 	}
 	log.Info().Msg("Authenticated to Infralight App Server successfully")
-	//uniqueClusterId, err := f.getUniqueClusterId(ctx)
+	uniqueClusterId, err := f.getUniqueClusterId(ctx)
 	if err != nil {
 		return fmt.Errorf("failed finding Kubernetes unique cluster ID: %w", err)
 	}
-	//fetchingId, err := f.startNewFetching("dd")
+	fetchingId, err := f.startNewFetching(uniqueClusterId)
 	if err != nil {
 		return fmt.Errorf("failed starting new fetching with Infralight API: %w", err)
 	}
@@ -125,11 +125,11 @@ func (f *Collector) Run(ctx context.Context) (err error) {
 	}
 	log.Debug().Msg("Sending data to Infralight App Server")
 
-	//err = f.sendHelmReleases(fetchingId, fullData["helm_releases"], fullData["k8s_types"])
-	//
-	//if err != nil {
-	//    return fmt.Errorf("failed sending releases to Infralight: %w", err)
-	//}
+	err = f.sendHelmReleases(fetchingId, fullData["helm_releases"], fullData["k8s_types"])
+
+	if err != nil {
+		return fmt.Errorf("failed sending releases to Infralight: %w", err)
+	}
 
 	k8sTree, err := k8stree.GetK8sTree(fullData["k8s_objects"])
 
@@ -137,13 +137,13 @@ func (f *Collector) Run(ctx context.Context) (err error) {
 		return fmt.Errorf("failed getting k8s objects tree: %w", err)
 	}
 
-	err = f.sendK8sTree("ddd", k8sTree)
+	err = f.sendK8sTree(fetchingId, k8sTree)
 
 	if err != nil {
 		return fmt.Errorf("failed sending k8s objects tree to Infralight: %w", err)
 	}
 
-	err = f.sendK8sObjects("ddd", fullData["k8s_objects"])
+	err = f.sendK8sObjects(fetchingId, fullData["k8s_objects"])
 
 	if err != nil {
 		return fmt.Errorf("failed sending objects to Infralight: %w", err)
