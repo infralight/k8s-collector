@@ -112,7 +112,7 @@ func (f *Collector) Run(ctx context.Context) (err error) {
 	if err != nil {
 		return fmt.Errorf("failed starting new fetching with Infralight API: %w", err)
 	}
-	log.Info().Str("fetchingId", "ddd").Msg("Starting new fetching process")
+	log.Info().Str("fetchingId", fetchingId).Msg("Starting new fetching process")
 	fullData := make(map[string][]interface{}, len(f.dataCollectors))
 	log.Debug().Int("amount", len(f.dataCollectors)).Msg("Running Kubernetes collectors")
 	for _, dc := range f.dataCollectors {
