@@ -352,7 +352,7 @@ func (f *Collector) sendK8sTree(fetchingId string, data []k8stree.ObjectsTree) e
 		name := tree.Name
 		tree.Name = ""
 		bytes, err := json.Marshal(tree)
-		if tree.Children == nil || len(tree.Children) == 0 {
+		if (tree.Children == nil || len(tree.Children) == 0) && tree.Kind != "Ingress" && tree.Kind != "Provisioner" {
 			f.conf.Log.Debug().
 				Int("children", len(tree.Children)).
 				Str("kind", tree.Kind).
