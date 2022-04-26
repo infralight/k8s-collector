@@ -2,7 +2,7 @@ name: Build K8s Collector Helm Chart
 on:
   push:
     branches:
-      - main
+      - helm-releaser
 jobs:
   release:
     runs-on: ubuntu-latest
