@@ -3,7 +3,7 @@ apiVersion: rbac.authorization.k8s.io/v1
 metadata:
   name: {{ .Values.clusterRole.name }}
 
-{{- if or .Values.fetchEverything .Values.secrets }}
+{{- if or .Values.fetchEverything .Values.collectSecrets }}
 rules:
   - verbs:
       - get
