@@ -35,7 +35,7 @@ jobs:
         push: true
         tags: |
           infralightio/k8s-collector:${{ github.event.inputs.collectortag }}
-          infralightio/k8s-collector:latest
+#          infralightio/k8s-collector:latest
         labels: |
           org.opencontainers.image.created=${{ steps.current-time.outputs.time }}
           org.opencontainers.image.authors=Infralight
