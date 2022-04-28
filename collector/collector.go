@@ -4,16 +4,16 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"github.com/infralight/k8s-collector/collector/k8stree"
-	"net/http"
-	"regexp"
-
 	"github.com/ido50/requests"
+	"github.com/infralight/k8s-collector/collector/k8stree"
 	"github.com/rs/zerolog/log"
+	"golang.org/x/sync/errgroup"
 	"gopkg.in/mgo.v2/bson"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
+	"net/http"
+	"regexp"
 
 	"github.com/infralight/k8s-collector/collector/config"
 )
@@ -223,8 +223,8 @@ func (f *Collector) sendK8sObjects(fetchingId string, data []interface{}) error 
 		Int("MessageSize", len(data)).
 		Msg("Sending collected data to Infralight")
 
-	page := 0
 	totalBytes := 0
+	var chunks [][]interface{}
 	var objects []interface{}
 	for idx, obj := range data {
 		bytes, err := json.Marshal(obj)
@@ -239,10 +239,25 @@ func (f *Collector) sendK8sObjects(fetchingId string, data []interface{}) error 
 			objects = append(objects, obj)
 		}
 		if totalBytes > f.conf.PageSize*1000 || idx == len(data)-1 {
-			page += 1
+			chunks = append(chunks, objects)
+			objects = []interface{}{}
+			totalBytes = 0
+		}
+	}
+
+	concurrentGoroutines := make(chan struct{}, f.conf.MaxGoRoutines)
+	g, _ := errgroup.WithContext(context.Background())
+	for _, chunkObjects := range chunks {
+		concurrentGoroutines <- struct{}{}
+
+		routineObjects := chunkObjects
+		g.Go(func() error {
+			defer func() {
+				<-concurrentGoroutines
+			}()
 			body := make(map[string]interface{}, 2)
 			body["fetchingId"] = fetchingId
-			body["k8sObjects"] = objects
+			body["k8sObjects"] = routineObjects
 			err := requests.NewClient(f.conf.Endpoint).
 				Header("Authorization", fmt.Sprintf("Bearer %s", f.accessToken)).
 				NewRequest("POST", fmt.Sprintf("/integrations/k8s/%s/fetching/objects", f.clusterID)).
@@ -251,18 +266,21 @@ func (f *Collector) sendK8sObjects(fetchingId string, data []interface{}) error 
 				JSONBody(body).
 				Run()
 			if err != nil {
-				log.Err(err).Str("ClusterId", f.clusterID).Int("Page", page).Str("FetchingId", fetchingId).
-					Int("ResourcesInPage", len(objects)).Int("PageMessageSize", totalBytes).
+				log.Err(err).Str("ClusterId", f.clusterID).Str("FetchingId", fetchingId).
+					Int("ResourcesInPage", len(routineObjects)).
 					Msg("Error sending resources to server")
 				return err
 			}
-			log.Info().Str("ClusterId", f.clusterID).Int("Page", page).Str("FetchingId", fetchingId).
-				Int("ResourcesInPage", len(objects)).Int("PageMessageSize", totalBytes).
+			log.Info().Str("ClusterId", f.clusterID).Str("FetchingId", fetchingId).
+				Int("ResourcesInPage", len(routineObjects)).
 				Msg("Sent k8s objects page successfully")
-			objects = []interface{}{}
-			totalBytes = 0
-		}
+			return nil
+		})
 	}
+	if err := g.Wait(); err != nil {
+		return err
+	}
+
 	err := requests.NewClient(f.conf.Endpoint).
 		Header("Authorization", fmt.Sprintf("Bearer %s", f.accessToken)).
 		NewRequest("PATCH", fmt.Sprintf("/integrations/k8s/%s/fetching", f.clusterID)).
@@ -293,8 +311,8 @@ func (f *Collector) sendHelmReleases(fetchingId string, data []interface{}, type
 		Int("MessageSize", len(data)).
 		Msg("Sending collected helm releases to Infralight")
 
-	page := 0
 	totalBytes := 0
+	var chunks [][]interface{}
 	var objects []interface{}
 	for idx, obj := range data {
 		bytes, _ := json.Marshal(obj)
@@ -302,10 +320,25 @@ func (f *Collector) sendHelmReleases(fetchingId string, data []interface{}, type
 		objects = append(objects, obj)
 
 		if totalBytes > f.conf.PageSize*1000 || idx == len(data)-1 {
-			page += 1
+			chunks = append(chunks, objects)
+			objects = []interface{}{}
+			totalBytes = 0
+		}
+	}
+
+	concurrentGoroutines := make(chan struct{}, f.conf.MaxGoRoutines)
+	g, _ := errgroup.WithContext(context.Background())
+	for _, chunkObjects := range chunks {
+		concurrentGoroutines <- struct{}{}
+
+		routineObjects := chunkObjects
+		g.Go(func() error {
+			defer func() {
+				<-concurrentGoroutines
+			}()
 			body := make(map[string]interface{}, 3)
 			body["fetchingId"] = fetchingId
-			body["helmReleases"] = objects
+			body["helmReleases"] = routineObjects
 			body["k8sTypes"] = types
 			err := requests.NewClient(f.conf.Endpoint).
 				Header("Authorization", fmt.Sprintf("Bearer %s", f.accessToken)).
@@ -315,18 +348,21 @@ func (f *Collector) sendHelmReleases(fetchingId string, data []interface{}, type
 				JSONBody(body).
 				Run()
 			if err != nil {
-				log.Err(err).Str("ClusterId", f.clusterID).Int("Page", page).Str("FetchingId", fetchingId).
-					Int("ResourcesInPage", len(objects)).Int("PageMessageSize", totalBytes).
+				log.Err(err).Str("ClusterId", f.clusterID).Str("FetchingId", fetchingId).
+					Int("ResourcesInPage", len(routineObjects)).
 					Msg("Error sending resources to server")
 				return err
 			}
-			log.Info().Str("ClusterId", f.clusterID).Int("Page", page).Str("FetchingId", fetchingId).
-				Int("ResourcesInPage", len(objects)).Int("PageMessageSize", totalBytes).
+			log.Info().Str("ClusterId", f.clusterID).Str("FetchingId", fetchingId).
+				Int("ResourcesInPage", len(routineObjects)).
 				Msg("Sent helm releases page successfully")
-			objects = []interface{}{}
-			totalBytes = 0
-		}
+			return nil
+		})
 	}
+	if err := g.Wait(); err != nil {
+		return err
+	}
+
 	log.Info().
 		Str("FetchingId", fetchingId).
 		Int("Resources", len(data)).
@@ -345,8 +381,8 @@ func (f *Collector) sendK8sTree(fetchingId string, data []k8stree.ObjectsTree) e
 		Int("MessageSize", len(data)).
 		Msg("Sending collected data to Infralight")
 
-	page := 0
 	totalBytes := 0
+	var chunks [][]interface{}
 	var objectsTrees []interface{}
 	for idx, tree := range data {
 		name := tree.Name
@@ -377,10 +413,25 @@ func (f *Collector) sendK8sTree(fetchingId string, data []k8stree.ObjectsTree) e
 		}
 
 		if totalBytes > f.conf.PageSize*1000 || idx == len(data)-1 {
-			page += 1
+			chunks = append(chunks, objectsTrees)
+			objectsTrees = []interface{}{}
+			totalBytes = 0
+		}
+	}
+
+	concurrentGoroutines := make(chan struct{}, f.conf.MaxGoRoutines)
+	g, _ := errgroup.WithContext(context.Background())
+	for _, chunkObjectsTrees := range chunks {
+		concurrentGoroutines <- struct{}{}
+
+		routineObjects := chunkObjectsTrees
+		g.Go(func() error {
+			defer func() {
+				<-concurrentGoroutines
+			}()
 			body := make(map[string]interface{}, 2)
 			body["fetchingId"] = fetchingId
-			body["k8sTrees"] = objectsTrees
+			body["k8sTrees"] = routineObjects
 			err := requests.NewClient(f.conf.Endpoint).
 				Header("Authorization", fmt.Sprintf("Bearer %s", f.accessToken)).
 				NewRequest("POST", fmt.Sprintf("/integrations/k8s/%s/fetching/tree", f.clusterID)).
@@ -389,18 +440,21 @@ func (f *Collector) sendK8sTree(fetchingId string, data []k8stree.ObjectsTree) e
 				JSONBody(body).
 				Run()
 			if err != nil {
-				log.Err(err).Str("ClusterId", f.clusterID).Int("Page", page).Str("FetchingId", fetchingId).
-					Int("ResourcesInPage", len(objectsTrees)).Int("PageMessageSize", totalBytes).
+				log.Err(err).Str("ClusterId", f.clusterID).Str("FetchingId", fetchingId).
+					Int("ResourcesInPage", len(routineObjects)).
 					Msg("Error sending resources to server")
 				return err
 			}
-			log.Info().Str("ClusterId", f.clusterID).Int("Page", page).Str("FetchingId", fetchingId).
-				Int("ResourcesInPage", len(objectsTrees)).Int("PageMessageSize", totalBytes).
+			log.Info().Str("ClusterId", f.clusterID).Str("FetchingId", fetchingId).
+				Int("ResourcesInPage", len(routineObjects)).
 				Msg("Sent k8s objects trees page successfully")
-			objectsTrees = []interface{}{}
-			totalBytes = 0
-		}
+			return nil
+		})
 	}
+	if err := g.Wait(); err != nil {
+		return err
+	}
+
 	log.Info().
 		Str("FetchingId", fetchingId).
 		Int("Resources", len(data)).
