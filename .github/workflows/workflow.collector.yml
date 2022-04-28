@@ -29,13 +29,13 @@ jobs:
       id: current-time
 
     - name: Build and push image to prod
-#      if: ${{ github.ref == 'refs/heads/main' }}
+      if: ${{ github.ref == 'refs/heads/main' }}
       uses: docker/build-push-action@v2
       with:
         push: true
         tags: |
           infralightio/k8s-collector:${{ github.event.inputs.collectortag }}
-#          infralightio/k8s-collector:latest
+          infralightio/k8s-collector:latest
         labels: |
           org.opencontainers.image.created=${{ steps.current-time.outputs.time }}
           org.opencontainers.image.authors=Infralight
