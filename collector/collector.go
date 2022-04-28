@@ -247,7 +247,7 @@ func (f *Collector) sendK8sObjects(fetchingId string, data []interface{}) error 
 
 	concurrentGoroutines := make(chan struct{}, f.conf.MaxGoRoutines)
 	g, _ := errgroup.WithContext(context.Background())
-	for i, objects := range chunks {
+	for _, objects := range chunks {
 		concurrentGoroutines <- struct{}{}
 
 		g.Go(func() error {
@@ -265,13 +265,13 @@ func (f *Collector) sendK8sObjects(fetchingId string, data []interface{}) error 
 				JSONBody(body).
 				Run()
 			if err != nil {
-				log.Err(err).Str("ClusterId", f.clusterID).Int("Page", i).Str("FetchingId", fetchingId).
-					Int("ResourcesInPage", len(objects)).Int("PageMessageSize", totalBytes).
+				log.Err(err).Str("ClusterId", f.clusterID).Str("FetchingId", fetchingId).
+					Int("ResourcesInPage", len(objects)).
 					Msg("Error sending resources to server")
 				return err
 			}
-			log.Info().Str("ClusterId", f.clusterID).Int("Page", i).Str("FetchingId", fetchingId).
-				Int("ResourcesInPage", len(objects)).Int("PageMessageSize", totalBytes).
+			log.Info().Str("ClusterId", f.clusterID).Str("FetchingId", fetchingId).
+				Int("ResourcesInPage", len(objects)).
 				Msg("Sent k8s objects page successfully")
 			return nil
 		})
@@ -327,7 +327,7 @@ func (f *Collector) sendHelmReleases(fetchingId string, data []interface{}, type
 
 	concurrentGoroutines := make(chan struct{}, f.conf.MaxGoRoutines)
 	g, _ := errgroup.WithContext(context.Background())
-	for i, objects := range chunks {
+	for _, objects := range chunks {
 		concurrentGoroutines <- struct{}{}
 
 		g.Go(func() error {
@@ -346,13 +346,13 @@ func (f *Collector) sendHelmReleases(fetchingId string, data []interface{}, type
 				JSONBody(body).
 				Run()
 			if err != nil {
-				log.Err(err).Str("ClusterId", f.clusterID).Int("Page", i).Str("FetchingId", fetchingId).
-					Int("ResourcesInPage", len(objects)).Int("PageMessageSize", totalBytes).
+				log.Err(err).Str("ClusterId", f.clusterID).Str("FetchingId", fetchingId).
+					Int("ResourcesInPage", len(objects)).
 					Msg("Error sending resources to server")
 				return err
 			}
-			log.Info().Str("ClusterId", f.clusterID).Int("Page", i).Str("FetchingId", fetchingId).
-				Int("ResourcesInPage", len(objects)).Int("PageMessageSize", totalBytes).
+			log.Info().Str("ClusterId", f.clusterID).Str("FetchingId", fetchingId).
+				Int("ResourcesInPage", len(objects)).
 				Msg("Sent helm releases page successfully")
 			return nil
 		})
@@ -419,7 +419,7 @@ func (f *Collector) sendK8sTree(fetchingId string, data []k8stree.ObjectsTree) e
 
 	concurrentGoroutines := make(chan struct{}, f.conf.MaxGoRoutines)
 	g, _ := errgroup.WithContext(context.Background())
-	for i, objectsTrees := range chunks {
+	for _, objectsTrees := range chunks {
 		concurrentGoroutines <- struct{}{}
 
 		g.Go(func() error {
@@ -437,13 +437,13 @@ func (f *Collector) sendK8sTree(fetchingId string, data []k8stree.ObjectsTree) e
 				JSONBody(body).
 				Run()
 			if err != nil {
-				log.Err(err).Str("ClusterId", f.clusterID).Int("Page", i).Str("FetchingId", fetchingId).
-					Int("ResourcesInPage", len(objectsTrees)).Int("PageMessageSize", totalBytes).
+				log.Err(err).Str("ClusterId", f.clusterID).Str("FetchingId", fetchingId).
+					Int("ResourcesInPage", len(objectsTrees)).
 					Msg("Error sending resources to server")
 				return err
 			}
-			log.Info().Str("ClusterId", f.clusterID).Int("Page", i).Str("FetchingId", fetchingId).
-				Int("ResourcesInPage", len(objectsTrees)).Int("PageMessageSize", totalBytes).
+			log.Info().Str("ClusterId", f.clusterID).Str("FetchingId", fetchingId).
+				Int("ResourcesInPage", len(objectsTrees)).
 				Msg("Sent k8s objects trees page successfully")
 			return nil
 		})
