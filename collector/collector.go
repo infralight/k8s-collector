@@ -275,9 +275,9 @@ func (f *Collector) sendK8sObjects(fetchingId string, data []interface{}) error 
 				Msg("Sent k8s objects page successfully")
 			return nil
 		})
-		if err := g.Wait(); err != nil {
-			return err
-		}
+	}
+	if err := g.Wait(); err != nil {
+		return err
 	}
 
 	err := requests.NewClient(f.conf.Endpoint).
@@ -356,9 +356,9 @@ func (f *Collector) sendHelmReleases(fetchingId string, data []interface{}, type
 				Msg("Sent helm releases page successfully")
 			return nil
 		})
-		if err := g.Wait(); err != nil {
-			return err
-		}
+	}
+	if err := g.Wait(); err != nil {
+		return err
 	}
 
 	log.Info().
@@ -447,9 +447,9 @@ func (f *Collector) sendK8sTree(fetchingId string, data []k8stree.ObjectsTree) e
 				Msg("Sent k8s objects trees page successfully")
 			return nil
 		})
-		if err := g.Wait(); err != nil {
-			return err
-		}
+	}
+	if err := g.Wait(); err != nil {
+		return err
 	}
 
 	log.Info().
