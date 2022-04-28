@@ -247,16 +247,17 @@ func (f *Collector) sendK8sObjects(fetchingId string, data []interface{}) error 
 
 	concurrentGoroutines := make(chan struct{}, f.conf.MaxGoRoutines)
 	g, _ := errgroup.WithContext(context.Background())
-	for _, objects := range chunks {
+	for _, chunkObjects := range chunks {
 		concurrentGoroutines <- struct{}{}
 
+		routineObjects := chunkObjects
 		g.Go(func() error {
 			defer func() {
 				<-concurrentGoroutines
 			}()
 			body := make(map[string]interface{}, 2)
 			body["fetchingId"] = fetchingId
-			body["k8sObjects"] = objects
+			body["k8sObjects"] = routineObjects
 			err := requests.NewClient(f.conf.Endpoint).
 				Header("Authorization", fmt.Sprintf("Bearer %s", f.accessToken)).
 				NewRequest("POST", fmt.Sprintf("/integrations/k8s/%s/fetching/objects", f.clusterID)).
@@ -266,12 +267,12 @@ func (f *Collector) sendK8sObjects(fetchingId string, data []interface{}) error 
 				Run()
 			if err != nil {
 				log.Err(err).Str("ClusterId", f.clusterID).Str("FetchingId", fetchingId).
-					Int("ResourcesInPage", len(objects)).
+					Int("ResourcesInPage", len(routineObjects)).
 					Msg("Error sending resources to server")
 				return err
 			}
 			log.Info().Str("ClusterId", f.clusterID).Str("FetchingId", fetchingId).
-				Int("ResourcesInPage", len(objects)).
+				Int("ResourcesInPage", len(routineObjects)).
 				Msg("Sent k8s objects page successfully")
 			return nil
 		})
@@ -327,16 +328,17 @@ func (f *Collector) sendHelmReleases(fetchingId string, data []interface{}, type
 
 	concurrentGoroutines := make(chan struct{}, f.conf.MaxGoRoutines)
 	g, _ := errgroup.WithContext(context.Background())
-	for _, objects := range chunks {
+	for _, chunkObjects := range chunks {
 		concurrentGoroutines <- struct{}{}
 
+		routineObjects := chunkObjects
 		g.Go(func() error {
 			defer func() {
 				<-concurrentGoroutines
 			}()
 			body := make(map[string]interface{}, 3)
 			body["fetchingId"] = fetchingId
-			body["helmReleases"] = objects
+			body["helmReleases"] = routineObjects
 			body["k8sTypes"] = types
 			err := requests.NewClient(f.conf.Endpoint).
 				Header("Authorization", fmt.Sprintf("Bearer %s", f.accessToken)).
@@ -347,12 +349,12 @@ func (f *Collector) sendHelmReleases(fetchingId string, data []interface{}, type
 				Run()
 			if err != nil {
 				log.Err(err).Str("ClusterId", f.clusterID).Str("FetchingId", fetchingId).
-					Int("ResourcesInPage", len(objects)).
+					Int("ResourcesInPage", len(routineObjects)).
 					Msg("Error sending resources to server")
 				return err
 			}
 			log.Info().Str("ClusterId", f.clusterID).Str("FetchingId", fetchingId).
-				Int("ResourcesInPage", len(objects)).
+				Int("ResourcesInPage", len(routineObjects)).
 				Msg("Sent helm releases page successfully")
 			return nil
 		})
@@ -419,16 +421,17 @@ func (f *Collector) sendK8sTree(fetchingId string, data []k8stree.ObjectsTree) e
 
 	concurrentGoroutines := make(chan struct{}, f.conf.MaxGoRoutines)
 	g, _ := errgroup.WithContext(context.Background())
-	for _, objectsTrees := range chunks {
+	for _, chunkObjectsTrees := range chunks {
 		concurrentGoroutines <- struct{}{}
 
+		routineObjects := chunkObjectsTrees
 		g.Go(func() error {
 			defer func() {
 				<-concurrentGoroutines
 			}()
 			body := make(map[string]interface{}, 2)
 			body["fetchingId"] = fetchingId
-			body["k8sTrees"] = objectsTrees
+			body["k8sTrees"] = routineObjects
 			err := requests.NewClient(f.conf.Endpoint).
 				Header("Authorization", fmt.Sprintf("Bearer %s", f.accessToken)).
 				NewRequest("POST", fmt.Sprintf("/integrations/k8s/%s/fetching/tree", f.clusterID)).
@@ -438,12 +441,12 @@ func (f *Collector) sendK8sTree(fetchingId string, data []k8stree.ObjectsTree) e
 				Run()
 			if err != nil {
 				log.Err(err).Str("ClusterId", f.clusterID).Str("FetchingId", fetchingId).
-					Int("ResourcesInPage", len(objectsTrees)).
+					Int("ResourcesInPage", len(routineObjects)).
 					Msg("Error sending resources to server")
 				return err
 			}
 			log.Info().Str("ClusterId", f.clusterID).Str("FetchingId", fetchingId).
-				Int("ResourcesInPage", len(objectsTrees)).
+				Int("ResourcesInPage", len(routineObjects)).
 				Msg("Sent k8s objects trees page successfully")
 			return nil
 		})
