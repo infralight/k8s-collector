@@ -4,18 +4,16 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"github.com/infralight/k8s-collector/collector/k8stree"
-	"golang.org/x/sync/errgroup"
-	"net/http"
-	"regexp"
-	"sync"
-
 	"github.com/ido50/requests"
+	"github.com/infralight/k8s-collector/collector/k8stree"
 	"github.com/rs/zerolog/log"
+	"golang.org/x/sync/errgroup"
 	"gopkg.in/mgo.v2/bson"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
+	"net/http"
+	"regexp"
 
 	"github.com/infralight/k8s-collector/collector/config"
 )
@@ -225,65 +223,61 @@ func (f *Collector) sendK8sObjects(fetchingId string, data []interface{}) error 
 		Int("MessageSize", len(data)).
 		Msg("Sending collected data to Infralight")
 
-	page := 0
 	totalBytes := 0
+	var chunks [][]interface{}
 	var objects []interface{}
-	var mu sync.Mutex
+	for idx, obj := range data {
+		bytes, err := json.Marshal(obj)
+		if err != nil {
+			f.conf.Log.Err(err).
+				Msg("failed to send resource")
+		} else if len(bytes) > MaxItemSize {
+			f.conf.Log.Warn().
+				Msg("skipping massive resource")
+		} else {
+			totalBytes += len(bytes)
+			objects = append(objects, obj)
+		}
+		if totalBytes > f.conf.PageSize*1000 || idx == len(data)-1 {
+			chunks = append(chunks, objects)
+			objects = []interface{}{}
+			totalBytes = 0
+		}
+	}
+
 	concurrentGoroutines := make(chan struct{}, f.conf.MaxGoRoutines)
 	g, _ := errgroup.WithContext(context.Background())
-	for idx, obj := range data {
+	for i, objects := range chunks {
 		concurrentGoroutines <- struct{}{}
 
 		g.Go(func() error {
 			defer func() {
 				<-concurrentGoroutines
 			}()
-			bytes, err := json.Marshal(obj)
+			body := make(map[string]interface{}, 2)
+			body["fetchingId"] = fetchingId
+			body["k8sObjects"] = objects
+			err := requests.NewClient(f.conf.Endpoint).
+				Header("Authorization", fmt.Sprintf("Bearer %s", f.accessToken)).
+				NewRequest("POST", fmt.Sprintf("/integrations/k8s/%s/fetching/objects", f.clusterID)).
+				CompressWith(requests.CompressionAlgorithmGzip).
+				ExpectedStatus(http.StatusNoContent).
+				JSONBody(body).
+				Run()
 			if err != nil {
-				f.conf.Log.Err(err).
-					Msg("failed to send resource")
-			} else if len(bytes) > MaxItemSize {
-				f.conf.Log.Warn().
-					Msg("skipping massive resource")
-			} else {
-				mu.Lock()
-				totalBytes += len(bytes)
-				objects = append(objects, obj)
-				mu.Unlock()
-			}
-			if totalBytes > f.conf.PageSize*1000 || idx == len(data)-1 {
-				mu.Lock()
-				page += 1
-				mu.Unlock()
-				body := make(map[string]interface{}, 2)
-				body["fetchingId"] = fetchingId
-				body["k8sObjects"] = objects
-				err := requests.NewClient(f.conf.Endpoint).
-					Header("Authorization", fmt.Sprintf("Bearer %s", f.accessToken)).
-					NewRequest("POST", fmt.Sprintf("/integrations/k8s/%s/fetching/objects", f.clusterID)).
-					CompressWith(requests.CompressionAlgorithmGzip).
-					ExpectedStatus(http.StatusNoContent).
-					JSONBody(body).
-					Run()
-				if err != nil {
-					log.Err(err).Str("ClusterId", f.clusterID).Int("Page", page).Str("FetchingId", fetchingId).
-						Int("ResourcesInPage", len(objects)).Int("PageMessageSize", totalBytes).
-						Msg("Error sending resources to server")
-					return err
-				}
-				log.Info().Str("ClusterId", f.clusterID).Int("Page", page).Str("FetchingId", fetchingId).
+				log.Err(err).Str("ClusterId", f.clusterID).Int("Page", i).Str("FetchingId", fetchingId).
 					Int("ResourcesInPage", len(objects)).Int("PageMessageSize", totalBytes).
-					Msg("Sent k8s objects page successfully")
-				mu.Lock()
-				objects = []interface{}{}
-				totalBytes = 0
-				mu.Unlock()
+					Msg("Error sending resources to server")
+				return err
 			}
+			log.Info().Str("ClusterId", f.clusterID).Int("Page", i).Str("FetchingId", fetchingId).
+				Int("ResourcesInPage", len(objects)).Int("PageMessageSize", totalBytes).
+				Msg("Sent k8s objects page successfully")
 			return nil
 		})
-	}
-	if err := g.Wait(); err != nil {
-		return err
+		if err := g.Wait(); err != nil {
+			return err
+		}
 	}
 
 	err := requests.NewClient(f.conf.Endpoint).
@@ -316,60 +310,57 @@ func (f *Collector) sendHelmReleases(fetchingId string, data []interface{}, type
 		Int("MessageSize", len(data)).
 		Msg("Sending collected helm releases to Infralight")
 
-	page := 0
 	totalBytes := 0
+	var chunks [][]interface{}
 	var objects []interface{}
-	var mu sync.Mutex
+	for idx, obj := range data {
+		bytes, _ := json.Marshal(obj)
+		totalBytes += len(bytes)
+		objects = append(objects, obj)
+
+		if totalBytes > f.conf.PageSize*1000 || idx == len(data)-1 {
+			chunks = append(chunks, objects)
+			objects = []interface{}{}
+			totalBytes = 0
+		}
+	}
+
 	concurrentGoroutines := make(chan struct{}, f.conf.MaxGoRoutines)
 	g, _ := errgroup.WithContext(context.Background())
-	for idx, obj := range data {
+	for i, objects := range chunks {
 		concurrentGoroutines <- struct{}{}
 
 		g.Go(func() error {
 			defer func() {
 				<-concurrentGoroutines
 			}()
-			bytes, _ := json.Marshal(obj)
-			mu.Lock()
-			totalBytes += len(bytes)
-			objects = append(objects, obj)
-			mu.Unlock()
-
-			if totalBytes > f.conf.PageSize*1000 || idx == len(data)-1 {
-				mu.Lock()
-				page += 1
-				mu.Unlock()
-				body := make(map[string]interface{}, 3)
-				body["fetchingId"] = fetchingId
-				body["helmReleases"] = objects
-				body["k8sTypes"] = types
-				err := requests.NewClient(f.conf.Endpoint).
-					Header("Authorization", fmt.Sprintf("Bearer %s", f.accessToken)).
-					NewRequest("POST", fmt.Sprintf("/integrations/k8s/%s/fetching/helm", f.clusterID)).
-					CompressWith(requests.CompressionAlgorithmGzip).
-					ExpectedStatus(http.StatusNoContent).
-					JSONBody(body).
-					Run()
-				if err != nil {
-					log.Err(err).Str("ClusterId", f.clusterID).Int("Page", page).Str("FetchingId", fetchingId).
-						Int("ResourcesInPage", len(objects)).Int("PageMessageSize", totalBytes).
-						Msg("Error sending resources to server")
-					return err
-				}
-				log.Info().Str("ClusterId", f.clusterID).Int("Page", page).Str("FetchingId", fetchingId).
+			body := make(map[string]interface{}, 3)
+			body["fetchingId"] = fetchingId
+			body["helmReleases"] = objects
+			body["k8sTypes"] = types
+			err := requests.NewClient(f.conf.Endpoint).
+				Header("Authorization", fmt.Sprintf("Bearer %s", f.accessToken)).
+				NewRequest("POST", fmt.Sprintf("/integrations/k8s/%s/fetching/helm", f.clusterID)).
+				CompressWith(requests.CompressionAlgorithmGzip).
+				ExpectedStatus(http.StatusNoContent).
+				JSONBody(body).
+				Run()
+			if err != nil {
+				log.Err(err).Str("ClusterId", f.clusterID).Int("Page", i).Str("FetchingId", fetchingId).
 					Int("ResourcesInPage", len(objects)).Int("PageMessageSize", totalBytes).
-					Msg("Sent helm releases page successfully")
-				mu.Lock()
-				objects = []interface{}{}
-				totalBytes = 0
-				mu.Unlock()
+					Msg("Error sending resources to server")
+				return err
 			}
+			log.Info().Str("ClusterId", f.clusterID).Int("Page", i).Str("FetchingId", fetchingId).
+				Int("ResourcesInPage", len(objects)).Int("PageMessageSize", totalBytes).
+				Msg("Sent helm releases page successfully")
 			return nil
 		})
+		if err := g.Wait(); err != nil {
+			return err
+		}
 	}
-	if err := g.Wait(); err != nil {
-		return err
-	}
+
 	log.Info().
 		Str("FetchingId", fetchingId).
 		Int("Resources", len(data)).
@@ -388,82 +379,79 @@ func (f *Collector) sendK8sTree(fetchingId string, data []k8stree.ObjectsTree) e
 		Int("MessageSize", len(data)).
 		Msg("Sending collected data to Infralight")
 
-	page := 0
 	totalBytes := 0
+	var chunks [][]interface{}
 	var objectsTrees []interface{}
-	var mu sync.Mutex
+	for idx, tree := range data {
+		name := tree.Name
+		tree.Name = ""
+		bytes, err := json.Marshal(tree)
+		if (tree.Children == nil || len(tree.Children) == 0) && tree.Kind != "Ingress" && tree.Kind != "Provisioner" {
+			f.conf.Log.Debug().
+				Int("children", len(tree.Children)).
+				Str("kind", tree.Kind).
+				Str("name", name).
+				Msg("skipping empty tree")
+		} else if err != nil {
+			f.conf.Log.Err(err).
+				Int("children", len(tree.Children)).
+				Str("kind", tree.Kind).
+				Str("name", name).
+				Msg("failed to send tree")
+		} else if len(bytes) > MaxItemSize {
+			f.conf.Log.Warn().
+				Int("children", len(tree.Children)).
+				Int("size", len(bytes)).
+				Str("kind", tree.Kind).
+				Str("name", name).
+				Msg("skipping massive tree")
+		} else {
+			totalBytes += len(bytes)
+			objectsTrees = append(objectsTrees, tree)
+		}
+
+		if totalBytes > f.conf.PageSize*1000 || idx == len(data)-1 {
+			chunks = append(chunks, objectsTrees)
+			objectsTrees = []interface{}{}
+			totalBytes = 0
+		}
+	}
+
 	concurrentGoroutines := make(chan struct{}, f.conf.MaxGoRoutines)
 	g, _ := errgroup.WithContext(context.Background())
-	for idx, tree := range data {
+	for i, objectsTrees := range chunks {
 		concurrentGoroutines <- struct{}{}
 
 		g.Go(func() error {
 			defer func() {
 				<-concurrentGoroutines
 			}()
-			name := tree.Name
-			tree.Name = ""
-			bytes, err := json.Marshal(tree)
-			if (tree.Children == nil || len(tree.Children) == 0) && tree.Kind != "Ingress" && tree.Kind != "Provisioner" {
-				f.conf.Log.Debug().
-					Int("children", len(tree.Children)).
-					Str("kind", tree.Kind).
-					Str("name", name).
-					Msg("skipping empty tree")
-			} else if err != nil {
-				f.conf.Log.Err(err).
-					Int("children", len(tree.Children)).
-					Str("kind", tree.Kind).
-					Str("name", name).
-					Msg("failed to send tree")
-			} else if len(bytes) > MaxItemSize {
-				f.conf.Log.Warn().
-					Int("children", len(tree.Children)).
-					Int("size", len(bytes)).
-					Str("kind", tree.Kind).
-					Str("name", name).
-					Msg("skipping massive tree")
-			} else {
-				mu.Lock()
-				totalBytes += len(bytes)
-				objectsTrees = append(objectsTrees, tree)
-				mu.Unlock()
-			}
-
-			if totalBytes > f.conf.PageSize*1000 || idx == len(data)-1 {
-				mu.Lock()
-				page += 1
-				mu.Unlock()
-				body := make(map[string]interface{}, 2)
-				body["fetchingId"] = fetchingId
-				body["k8sTrees"] = objectsTrees
-				err := requests.NewClient(f.conf.Endpoint).
-					Header("Authorization", fmt.Sprintf("Bearer %s", f.accessToken)).
-					NewRequest("POST", fmt.Sprintf("/integrations/k8s/%s/fetching/tree", f.clusterID)).
-					CompressWith(requests.CompressionAlgorithmGzip).
-					ExpectedStatus(http.StatusNoContent).
-					JSONBody(body).
-					Run()
-				if err != nil {
-					log.Err(err).Str("ClusterId", f.clusterID).Int("Page", page).Str("FetchingId", fetchingId).
-						Int("ResourcesInPage", len(objectsTrees)).Int("PageMessageSize", totalBytes).
-						Msg("Error sending resources to server")
-					return err
-				}
-				log.Info().Str("ClusterId", f.clusterID).Int("Page", page).Str("FetchingId", fetchingId).
+			body := make(map[string]interface{}, 2)
+			body["fetchingId"] = fetchingId
+			body["k8sTrees"] = objectsTrees
+			err := requests.NewClient(f.conf.Endpoint).
+				Header("Authorization", fmt.Sprintf("Bearer %s", f.accessToken)).
+				NewRequest("POST", fmt.Sprintf("/integrations/k8s/%s/fetching/tree", f.clusterID)).
+				CompressWith(requests.CompressionAlgorithmGzip).
+				ExpectedStatus(http.StatusNoContent).
+				JSONBody(body).
+				Run()
+			if err != nil {
+				log.Err(err).Str("ClusterId", f.clusterID).Int("Page", i).Str("FetchingId", fetchingId).
 					Int("ResourcesInPage", len(objectsTrees)).Int("PageMessageSize", totalBytes).
-					Msg("Sent k8s objects trees page successfully")
-				mu.Lock()
-				objectsTrees = []interface{}{}
-				totalBytes = 0
-				mu.Unlock()
+					Msg("Error sending resources to server")
+				return err
 			}
+			log.Info().Str("ClusterId", f.clusterID).Int("Page", i).Str("FetchingId", fetchingId).
+				Int("ResourcesInPage", len(objectsTrees)).Int("PageMessageSize", totalBytes).
+				Msg("Sent k8s objects trees page successfully")
 			return nil
 		})
+		if err := g.Wait(); err != nil {
+			return err
+		}
 	}
-	if err := g.Wait(); err != nil {
-		return err
-	}
+
 	log.Info().
 		Str("FetchingId", fetchingId).
 		Int("Resources", len(data)).
