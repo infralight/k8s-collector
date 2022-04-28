@@ -60,6 +60,7 @@ func Test_loadConfig(t *testing.T) {
 				FetchClusterRoles:           true,
 				OverrideUniqueClusterId:     false,
 				PageSize:                    500,
+				MaxGoRoutines:               50,
 			},
 		},
 		{
@@ -102,6 +103,7 @@ func Test_loadConfig(t *testing.T) {
 				FetchClusterRoles:           true,
 				OverrideUniqueClusterId:     false,
 				PageSize:                    500,
+				MaxGoRoutines:               50,
 			},
 		},
 	}
