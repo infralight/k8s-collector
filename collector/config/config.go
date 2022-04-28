@@ -58,8 +58,8 @@ type Config struct {
 	// SecretKey is the Infralight secret key
 	SecretKey string
 
-    // UseSpecificRoute is a URL to override the firefly URL
-    UseSpecificRoute string
+	// UseSpecificRoute is a URL to override the firefly URL
+	UseSpecificRoute string
 
 	// Endpoint is the URL to the Infralight App Server
 	Endpoint string
@@ -120,6 +120,8 @@ type Config struct {
 	OverrideUniqueClusterId bool
 	// PageSize is an integer for max page size in KB
 	PageSize int
+	// MaxGoRoutines is an integer for max goroutines running at ones sending the chunks.
+	MaxGoRoutines int
 }
 
 // LoadConfig creates a new configuration object. A logger object, a file-system
@@ -158,12 +160,12 @@ func LoadConfig(
 		Log:       log,
 	}
 
-    conf.UseSpecificRoute = strings.TrimSuffix(parseOne(conf.etcConfig("useSpecificRoute"), ""), "/")
-    if conf.UseSpecificRoute == "" {
-        conf.Endpoint = "https://prod.external.api.infralight.cloud"
-    } else {
-        conf.Endpoint = conf.UseSpecificRoute
-    }
+	conf.UseSpecificRoute = strings.TrimSuffix(parseOne(conf.etcConfig("useSpecificRoute"), ""), "/")
+	if conf.UseSpecificRoute == "" {
+		conf.Endpoint = "https://prod.external.api.infralight.cloud"
+	} else {
+		conf.Endpoint = conf.UseSpecificRoute
+	}
 
 	conf.AccessKey = accessKey
 	conf.SecretKey = secretKey
@@ -193,6 +195,7 @@ func LoadConfig(
 	conf.FetchClusterRoles = parseBool(conf.etcConfig("collector.resources.clusterRoles"), true)
 	conf.OverrideUniqueClusterId = parseBool(conf.etcConfig("collector.OverrideUniqueClusterId"), false)
 	conf.PageSize = parseInt(conf.etcConfig("collector.PageSize"), 500)
+	conf.MaxGoRoutines = parseInt(conf.etcConfig("collector.MaxGoRoutines"), 50)
 
 	return conf, nil
 }
