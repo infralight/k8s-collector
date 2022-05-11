@@ -16,6 +16,12 @@ rules:
 {{- else }}
 rules:
   - apiGroups:
+      - '*'
+    verbs:
+      - get
+      - list
+      - watch
+    resources:
       - clusterroles
       - ingresses
       - networkpolicies
@@ -44,10 +50,12 @@ rules:
       - rollouts/finalizers
       - analysistemplates
       - clusteranalysistemplates
-    verbs:
+  - verbs:
       - get
       - list
       - watch
-    resources:
+    apiGroups:
       - '*'
-{{- end }}
+    resources: [ "secrets" ]
+    resourceNames: [ "sh.helm.release.*" ]
+  {{- end }}

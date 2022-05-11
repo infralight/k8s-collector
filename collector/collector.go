@@ -118,6 +118,11 @@ func (f *Collector) Run(ctx context.Context) (err error) {
 	for _, dc := range f.dataCollectors {
 		keyName, data, err := dc.Run(ctx, f.conf)
 		if err != nil {
+			if keyName == "helm_releases" {
+				log.Err(err).Str("fetchingId", fetchingId).Msg("Failed fetching helm releases")
+				fullData[keyName] = data
+				continue
+			}
 			return fmt.Errorf("%s collector failed: %w", dc.Source(), err)
 		}
 
