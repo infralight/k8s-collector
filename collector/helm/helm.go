@@ -68,7 +68,7 @@ func (c *Collector) Run(ctx context.Context, _ *config.Config) (
 
 	results, err := client.Run()
 	if err != nil {
-		return keyName, data, fmt.Errorf("list failed: %w", err)
+		return "helm_releases", data, fmt.Errorf("list failed: %w", err)
 	}
 
 	releases := make([]interface{}, len(results))
