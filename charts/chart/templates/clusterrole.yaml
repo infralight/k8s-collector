@@ -50,12 +50,4 @@ rules:
       - rollouts/finalizers
       - analysistemplates
       - clusteranalysistemplates
-  - verbs:
-      - get
-      - list
-      - watch
-    apiGroups:
-      - '*'
-    resources: [ "secrets" ]
-    resourceNames: [ "sh.helm.release.*" ]
   {{- end }}
