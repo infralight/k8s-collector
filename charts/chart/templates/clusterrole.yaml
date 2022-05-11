@@ -16,6 +16,12 @@ rules:
 {{- else }}
 rules:
   - apiGroups:
+      - '*'
+    verbs:
+      - get
+      - list
+      - watch
+    resources:
       - clusterroles
       - ingresses
       - networkpolicies
@@ -44,10 +50,4 @@ rules:
       - rollouts/finalizers
       - analysistemplates
       - clusteranalysistemplates
-    verbs:
-      - get
-      - list
-      - watch
-    resources:
-      - '*'
-{{- end }}
+  {{- end }}
