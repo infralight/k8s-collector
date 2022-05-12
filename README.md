@@ -223,6 +223,7 @@ To release a new version of the chart, follow these directions:
 5. Manually run the "Build K8s Collector Image" workflow, providing it a tag
    whose value is the new version number you've used in Chart.yaml.
 
+
 ## License
 
 This project is distributed under the terms of the [Apache License 2.0](LICENSE).
