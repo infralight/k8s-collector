@@ -1,4 +1,0 @@
-#!/bin/sh
-
-helm package -d docs ./chart
-helm repo index docs --url https://infralight.github.io/k8s-collector/
