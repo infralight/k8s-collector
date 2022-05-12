@@ -1,4 +1,0 @@
-Thank you for installing the Firefly Kubernetes Collector (version: {{ .Chart.AppVersion }}).
-The collector is implemented as a Kubernetes CronJob that is executed
-based on your chosen schedule (or every 15 minutes by default), and
-sends the information to the Firefly App Server.
