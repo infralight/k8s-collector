@@ -210,19 +210,19 @@ $ go test ./...
 $ golangci-lint run ./...
 ```
 
-### Updating the Helm Chart
+### Helm Chart (Automated workflow)
 
-The project's Helm chart is located within this repository itself, inside the
-docs/ directory, which is served via GitHub Pages. To release a new version of
-the chart, follow these directions:
+The project's Helm chart is located within this repository itself, at the charts/chart directory, which is served via GitHub Pages (branch:`gh-pages`).
+To release a new version of the chart, follow these directions:
 
 1. Perform changes to the collector's source code, if any.
-2. Update chart/Chart.yaml by modifying the values of "version" and "appVersion"
+2. Update charts/chart/Chart.yaml by modifying the values of "version" and "appVersion"
    to new version numbers.
-3. Run the `update-chart` script in the root directory.
-4. Commit and push to the repository.
+3. Commit and push to the repository.
+4. An automated workflow will trigger, that creates a release & updates the Github Pages at the `gh-pages` branch.
 5. Manually run the "Build K8s Collector Image" workflow, providing it a tag
    whose value is the new version number you've used in Chart.yaml.
+
 
 ## License
 
