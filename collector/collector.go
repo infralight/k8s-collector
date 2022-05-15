@@ -4,18 +4,21 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"net/http"
+	"os"
+	"regexp"
+
 	"github.com/ido50/requests"
+	"github.com/infralight/k8s-collector/collector/config"
+	"github.com/infralight/k8s-collector/collector/filter"
 	"github.com/infralight/k8s-collector/collector/k8stree"
+	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 	"golang.org/x/sync/errgroup"
 	"gopkg.in/mgo.v2/bson"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
-	"net/http"
-	"regexp"
-
-	"github.com/infralight/k8s-collector/collector/config"
 )
 
 const (
@@ -55,9 +58,13 @@ type Collector struct {
 
 	// the collector's configuration
 	conf *config.Config
+	log  *zerolog.Logger
 
 	// the data collectors
 	dataCollectors []DataCollector
+
+	// the data filters
+	dataFilters []filter.DataFilter
 }
 
 var clusterIDRegex = regexp.MustCompile(`^[a-z0-9-_]+$`)
@@ -82,9 +89,11 @@ func New(
 
 	return &Collector{
 		conf:           conf,
+		log:            conf.Log,
 		clusterConfig:  clusterConfig,
 		clusterID:      clusterID,
 		dataCollectors: dataCollectors,
+		dataFilters:    filter.All,
 	}
 }
 
@@ -96,30 +105,54 @@ func (f *Collector) Run(ctx context.Context) (err error) {
 	if !clusterIDRegex.MatchString(f.clusterID) {
 		return fmt.Errorf("invalid cluster ID, must match %s", clusterIDRegex)
 	}
-	log.Info().Str("Firefly Endpoint", f.conf.Endpoint).Msg("Starting")
+
+	f.log.Info().Str("Firefly Endpoint", f.conf.Endpoint).Msg("Starting")
 
 	// authenticate with the Infralight API
-	f.accessToken, err = f.authenticate()
-	if err != nil {
-		return fmt.Errorf("failed authenticating with Infralight API: %w", err)
+	if f.conf.DryRun {
+		log.Info().Msg("Skipping authentication due to dry-run")
+	} else {
+		f.accessToken, err = f.authenticate()
+		if err != nil {
+			return fmt.Errorf("failed authenticating with Infralight API: %w", err)
+		}
+
+		f.log.Info().Msg("Authenticated to Infralight App Server successfully")
 	}
-	log.Info().Msg("Authenticated to Infralight App Server successfully")
-	uniqueClusterId, err := f.getUniqueClusterId(ctx)
-	if err != nil {
-		return fmt.Errorf("failed finding Kubernetes unique cluster ID: %w", err)
+
+	var uniqueClusterId, fetchingId string
+
+	if f.conf.DryRun {
+		uniqueClusterId = "dry-run-cluster-id"
+		fetchingId = "dry-run-fetching-id"
+	} else {
+		uniqueClusterId, err = f.getUniqueClusterId(ctx)
+		if err != nil {
+			return fmt.Errorf("failed finding Kubernetes unique cluster ID: %w", err)
+		}
+
+		fetchingId, err = f.startNewFetching(uniqueClusterId)
+		if err != nil {
+			return fmt.Errorf("failed starting new fetching with Infralight API: %w", err)
+		}
 	}
-	fetchingId, err := f.startNewFetching(uniqueClusterId)
-	if err != nil {
-		return fmt.Errorf("failed starting new fetching with Infralight API: %w", err)
-	}
-	log.Info().Str("fetchingId", fetchingId).Msg("Starting new fetching process")
+
+	log := f.log.With().
+		Str("fetchingId", fetchingId).
+		Str("uniqueClusterId", uniqueClusterId).
+		Logger()
+
+	log.Info().Msg("Starting new fetching process")
+
 	fullData := make(map[string][]interface{}, len(f.dataCollectors))
+
 	log.Debug().Int("amount", len(f.dataCollectors)).Msg("Running Kubernetes collectors")
+
 	for _, dc := range f.dataCollectors {
 		keyName, data, err := dc.Run(ctx, f.conf)
 		if err != nil {
 			if keyName == "helm_releases" {
-				log.Err(err).Str("fetchingId", fetchingId).Msg("Failed fetching helm releases")
+				log.Warn().Err(err).Msg("Failed fetching helm releases")
 				fullData[keyName] = data
 				continue
 			}
@@ -128,28 +161,44 @@ func (f *Collector) Run(ctx context.Context) (err error) {
 
 		fullData[keyName] = data
 	}
+
+	for _, filter := range f.dataFilters {
+		log.Debug().Msg("Running filter")
+		err := filter(ctx, fullData)
+		if err != nil {
+			log.Warn().Err(err).Msg("Filter failed")
+			continue
+		}
+	}
+
+	if f.conf.DryRun {
+		enc := json.NewEncoder(os.Stdout)
+		err = enc.Encode(fullData)
+		if err != nil {
+			return fmt.Errorf("failed encoding collected data: %w", err)
+		}
+
+		return nil
+	}
+
 	log.Debug().Msg("Sending data to Infralight App Server")
 
 	err = f.sendHelmReleases(fetchingId, fullData["helm_releases"], fullData["k8s_types"])
-
 	if err != nil {
 		return fmt.Errorf("failed sending releases to Infralight: %w", err)
 	}
 
 	k8sTree, err := k8stree.GetK8sTree(fullData["k8s_objects"])
-
 	if err != nil {
 		return fmt.Errorf("failed getting k8s objects tree: %w", err)
 	}
 
 	err = f.sendK8sTree(fetchingId, k8sTree)
-
 	if err != nil {
 		return fmt.Errorf("failed sending k8s objects tree to Infralight: %w", err)
 	}
 
 	err = f.sendK8sObjects(fetchingId, fullData["k8s_objects"])
-
 	if err != nil {
 		return fmt.Errorf("failed sending objects to Infralight: %w", err)
 	}
@@ -180,10 +229,12 @@ func (f *Collector) getUniqueClusterId(ctx context.Context) (clusterId string, e
 	if err != nil {
 		return clusterId, fmt.Errorf("Failed creating Kubernetes Api object: %w", err)
 	}
+
 	kubeSystemNs, err := kubeApi.CoreV1().Namespaces().Get(ctx, "kube-system", metav1.GetOptions{})
 	if err != nil {
 		return clusterId, fmt.Errorf("Failed finding `kube-system` Kubernetes namespace: %w", err)
 	}
+
 	return string(kubeSystemNs.GetObjectMeta().GetUID()), nil
 }
 
@@ -297,14 +348,24 @@ func (f *Collector) sendK8sObjects(fetchingId string, data []interface{}) error 
 		}).
 		Run()
 	if err != nil {
-		log.Err(err).Str("ClusterId", f.clusterID).Str("FetchingId", fetchingId).Msg("Error sending LOCK")
+		log.Err(err).
+			Str("ClusterId", f.clusterID).
+			Str("FetchingId", fetchingId).
+			Msg("Error sending LOCK")
 		return nil
 	}
-	log.Info().Str("ClusterId", f.clusterID).Str("FetchingId", fetchingId).Msg("Sent LOCK successfully")
+	log.Info().
+		Str("ClusterId", f.clusterID).
+		Str("FetchingId", fetchingId).
+		Msg("Sent LOCK successfully")
 	return nil
 }
 
-func (f *Collector) sendHelmReleases(fetchingId string, data []interface{}, types []interface{}) error {
+func (f *Collector) sendHelmReleases(
+	fetchingId string,
+	data []interface{},
+	types []interface{},
+) error {
 	if len(data) == 0 {
 		f.conf.Log.Warn().
 			Str("FetchingId", fetchingId).
@@ -393,7 +454,8 @@ func (f *Collector) sendK8sTree(fetchingId string, data []k8stree.ObjectsTree) e
 		name := tree.Name
 		tree.Name = ""
 		bytes, err := json.Marshal(tree)
-		if (tree.Children == nil || len(tree.Children) == 0) && tree.Kind != "Ingress" && tree.Kind != "Provisioner" {
+		if (tree.Children == nil || len(tree.Children) == 0) && tree.Kind != "Ingress" &&
+			tree.Kind != "Provisioner" {
 			f.conf.Log.Debug().
 				Int("children", len(tree.Children)).
 				Str("kind", tree.Kind).

@@ -22,8 +22,13 @@ import (
 func main() {
 	// Parse command line flags
 	debug := flag.Bool("debug", false, "sets log level to debug")
-	external := flag.String("external", "", "run outside of the cluster (provide path to kubeconfig file)")
+	external := flag.String(
+		"external",
+		"",
+		"run outside of the cluster (provide path to kubeconfig file)",
+	)
 	configDir := flag.String("config", "/etc/config", "configuration files directory")
+	dryRun := flag.Bool("dry-run", false, "dry run (do not send anything to Firefly)")
 	flag.Parse()
 
 	// Initiate a logger
@@ -41,7 +46,7 @@ func main() {
 	}
 
 	// Load the collector configuration
-	conf, err := config.LoadConfig(logger, nil, *configDir)
+	conf, err := config.LoadConfig(logger, nil, *configDir, *dryRun)
 	if err != nil {
 		logger.Panic().
 			Err(err).

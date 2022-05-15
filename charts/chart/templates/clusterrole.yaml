@@ -50,4 +50,7 @@ rules:
       - rollouts/finalizers
       - analysistemplates
       - clusteranalysistemplates
+      {{- if or .Values.collectArgoApplications }}
+      - applications
+      {{- end }}
   {{- end }}

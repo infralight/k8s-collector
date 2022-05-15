@@ -26,5 +26,6 @@ resources:
 
 collectSecrets: false
 collectEvents: false
+collectArgoApplications: true
 overrideUniqueClusterId: false
 fetchEverything: true

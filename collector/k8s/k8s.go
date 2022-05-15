@@ -99,6 +99,7 @@ func (f *Collector) Run(ctx context.Context, conf *config.Config) (
 		"ComponentStatus":       conf.FetchComponentStatuses,
 		"FlowSchema":            conf.FetchFlowSchemas,
 		"PodMetrics":            conf.FetchPodMetrics,
+		"Application":           conf.FetchArgoApplications,
 	}
 
 	apiResourcesList, err := f.api.Discovery().ServerPreferredResources()
@@ -129,7 +130,12 @@ func (f *Collector) Run(ctx context.Context, conf *config.Config) (
 					Msg("Ignoring resources due to policy")
 				continue
 			}
-			itemsResponse := f.api.Discovery().RESTClient().Get().RequestURI(uri).Resource(resource.Name).Do(ctx)
+			itemsResponse := f.api.Discovery().
+				RESTClient().
+				Get().
+				RequestURI(uri).
+				Resource(resource.Name).
+				Do(ctx)
 			var responseCode int
 			itemsResponse.StatusCode(&responseCode)
 			if responseCode != 200 {
