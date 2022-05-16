@@ -88,6 +88,10 @@ func ArgoFilter(ctx context.Context, data map[string][]interface{}) error {
 			for i, ires := range resources {
 				if res, ok := ires.(map[string]interface{}); ok {
 					resApiVersion, _ := funk.Get(res, "version").(string)
+					resGroup, _ := funk.Get(res, "group").(string)
+					if resGroup != "" {
+						resApiVersion = fmt.Sprintf("%s/%s", resGroup, resApiVersion)
+					}
 					resKind, _ := funk.Get(res, "kind").(string)
 					resName, _ := funk.Get(res, "name").(string)
 					resNamespace, _ := funk.Get(res, "namespace").(string)
