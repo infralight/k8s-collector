@@ -23,8 +23,41 @@ func Test_loadConfig(t *testing.T) {
 		expConfig Config
 	}{
 		{
-			name:   "no secret",
-			expErr: ErrAccessKeys,
+			name: "no secret",
+			etcFiles: &fstest.MapFS{
+				"etc/config/endpoint": &fstest.MapFile{Data: []byte("http://localhost:5000/api\n")},
+			},
+			expConfig: Config{
+				Log:                         &logger,
+				DryRun:                      true,
+				ConfigDir:                   DefaultConfigDir,
+				AccessKey:                   "",
+				SecretKey:                   "",
+				Endpoint:                    "https://prod.external.api.infralight.cloud",
+				FetchEvents:                 false,
+				FetchConfigMaps:             true,
+				FetchReplicationControllers: true,
+				FetchSecrets:                false,
+				FetchServices:               true,
+				FetchServiceAccounts:        true,
+				FetchPods:                   true,
+				FetchNodes:                  true,
+				FetchPersistentVolumes:      true,
+				FetchPersistentVolumeClaims: true,
+				FetchNamespaces:             true,
+				FetchDeployments:            true,
+				FetchDaemonSets:             true,
+				FetchReplicaSets:            true,
+				FetchStatefulSets:           true,
+				FetchJobs:                   true,
+				FetchCronJobs:               true,
+				FetchIngresses:              true,
+				FetchClusterRoles:           true,
+				FetchArgoApplications:       true,
+				OverrideUniqueClusterId:     false,
+				PageSize:                    500,
+				MaxGoRoutines:               50,
+			},
 		},
 		{
 			name:      "no config",
@@ -58,6 +91,7 @@ func Test_loadConfig(t *testing.T) {
 				FetchCronJobs:               true,
 				FetchIngresses:              true,
 				FetchClusterRoles:           true,
+				FetchArgoApplications:       true,
 				OverrideUniqueClusterId:     false,
 				PageSize:                    500,
 				MaxGoRoutines:               50,
@@ -101,6 +135,7 @@ func Test_loadConfig(t *testing.T) {
 				FetchCronJobs:               true,
 				FetchIngresses:              true,
 				FetchClusterRoles:           true,
+				FetchArgoApplications:       true,
 				OverrideUniqueClusterId:     false,
 				PageSize:                    500,
 				MaxGoRoutines:               50,
@@ -126,7 +161,7 @@ func Test_loadConfig(t *testing.T) {
 			}
 
 			// Load collector configuration
-			conf, err := LoadConfig(&logger, memFs, "")
+			conf, err := LoadConfig(&logger, memFs, "", len(test.accessKey) == 0)
 			if test.expErr != nil {
 				assert.MustNotBeNil(t, err, "error must not be nil")
 				assert.True(t, errors.Is(err, test.expErr), "error must match")
