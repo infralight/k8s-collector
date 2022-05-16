@@ -49,6 +49,12 @@ type Config struct {
 	// this is /etc/config
 	ConfigDir string
 
+	// DryRun indicates whether the collector should only perform local read
+	// operations. When true, authentication against the Firefly API is not
+	// made, as is sending of collected data. Data is printed to standard output
+	// instead
+	DryRun bool
+
 	// The logger instance
 	Log *zerolog.Logger
 
@@ -116,6 +122,8 @@ type Config struct {
 	FetchPodMetrics bool
 	// FetchClusterRoles is a boolean indicating whether to collect Kubernetes ClusterRoles
 	FetchClusterRoles bool
+	// FetchArgoApplications is a boolean indicating whether to collect ArgoCD Applications
+	FetchArgoApplications bool
 	// OverrideUniqueClusterId is a boolean indicating whether to override the master url of the Kubernetes integration
 	OverrideUniqueClusterId bool
 	// PageSize is an integer for max page size in KB
@@ -133,6 +141,7 @@ func LoadConfig(
 	log *zerolog.Logger,
 	cfs fs.FS,
 	configDir string,
+	dryRun bool,
 ) (conf *Config, err error) {
 	if log == nil {
 		l := zerolog.Nop()
@@ -150,7 +159,7 @@ func LoadConfig(
 	// load Infralight API Key from the environment, this is required
 	accessKey := os.Getenv(AccessKeyEnvVar)
 	secretKey := os.Getenv(SecretKeyEnvVar)
-	if accessKey == "" || secretKey == "" {
+	if !dryRun && (accessKey == "" || secretKey == "") {
 		return conf, ErrAccessKeys
 	}
 
@@ -158,9 +167,13 @@ func LoadConfig(
 		FS:        cfs,
 		ConfigDir: configDir,
 		Log:       log,
+		DryRun:    dryRun,
 	}
 
-	conf.UseSpecificRoute = strings.TrimSuffix(parseOne(conf.etcConfig("useSpecificRoute"), ""), "/")
+	conf.UseSpecificRoute = strings.TrimSuffix(
+		parseOne(conf.etcConfig("useSpecificRoute"), ""),
+		"/",
+	)
 	if conf.UseSpecificRoute == "" {
 		conf.Endpoint = "https://prod.external.api.infralight.cloud"
 	} else {
@@ -172,13 +185,25 @@ func LoadConfig(
 	conf.Namespace = parseOne(conf.etcConfig("collector.watchNamespace"), "")
 	conf.IgnoreNamespaces = parseMultiple(conf.etcConfig("collector.ignoreNamespaces"), nil)
 	conf.FetchEvents = parseBool(conf.etcConfig("collector.resources.events"), false)
-	conf.FetchReplicationControllers = parseBool(conf.etcConfig("collector.resources.replicationControllers"), true)
+	conf.FetchReplicationControllers = parseBool(
+		conf.etcConfig("collector.resources.replicationControllers"),
+		true,
+	)
 	conf.FetchServices = parseBool(conf.etcConfig("collector.resources.services"), true)
-	conf.FetchServiceAccounts = parseBool(conf.etcConfig("collector.resources.serviceAccounts"), true)
+	conf.FetchServiceAccounts = parseBool(
+		conf.etcConfig("collector.resources.serviceAccounts"),
+		true,
+	)
 	conf.FetchPods = parseBool(conf.etcConfig("collector.resources.pods"), true)
 	conf.FetchNodes = parseBool(conf.etcConfig("collector.resources.nodes"), true)
-	conf.FetchPersistentVolumes = parseBool(conf.etcConfig("collector.resources.persistentVolumes"), true)
-	conf.FetchPersistentVolumeClaims = parseBool(conf.etcConfig("collector.resources.persistentVolumeClaims"), true)
+	conf.FetchPersistentVolumes = parseBool(
+		conf.etcConfig("collector.resources.persistentVolumes"),
+		true,
+	)
+	conf.FetchPersistentVolumeClaims = parseBool(
+		conf.etcConfig("collector.resources.persistentVolumeClaims"),
+		true,
+	)
 	conf.FetchNamespaces = parseBool(conf.etcConfig("collector.resources.namespaces"), true)
 	conf.FetchConfigMaps = parseBool(conf.etcConfig("collector.resources.configMaps"), true)
 	conf.FetchSecrets = parseBool(conf.etcConfig("collector.resources.secrets"), false)
@@ -189,11 +214,21 @@ func LoadConfig(
 	conf.FetchJobs = parseBool(conf.etcConfig("collector.resources.jobs"), true)
 	conf.FetchCronJobs = parseBool(conf.etcConfig("collector.resources.cronJobs"), true)
 	conf.FetchIngresses = parseBool(conf.etcConfig("collector.resources.ingresses"), true)
-	conf.FetchComponentStatuses = parseBool(conf.etcConfig("collector.resources.componentStatuses"), false)
+	conf.FetchComponentStatuses = parseBool(
+		conf.etcConfig("collector.resources.componentStatuses"),
+		false,
+	)
 	conf.FetchFlowSchemas = parseBool(conf.etcConfig("collector.resources.flowSchemas"), false)
 	conf.FetchPodMetrics = parseBool(conf.etcConfig("collector.resources.podMetrics"), false)
 	conf.FetchClusterRoles = parseBool(conf.etcConfig("collector.resources.clusterRoles"), true)
-	conf.OverrideUniqueClusterId = parseBool(conf.etcConfig("collector.OverrideUniqueClusterId"), false)
+	conf.FetchArgoApplications = parseBool(
+		conf.etcConfig("collector.resources.argoApplications"),
+		true,
+	)
+	conf.OverrideUniqueClusterId = parseBool(
+		conf.etcConfig("collector.OverrideUniqueClusterId"),
+		false,
+	)
 	conf.PageSize = parseInt(conf.etcConfig("collector.PageSize"), 500)
 	conf.MaxGoRoutines = parseInt(conf.etcConfig("collector.MaxGoRoutines"), 50)
 
