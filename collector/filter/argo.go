@@ -66,6 +66,10 @@ func ArgoFilter(ctx context.Context, data map[string][]interface{}) error {
 			home = strings.TrimSuffix(home, ".git")
 		}
 
+		if strings.HasSuffix(home, "/") {
+			home = strings.TrimSuffix(home, "/")
+		}
+
 		chartVersion, _ := funk.Get(meta, "spec.source.targetRevision").(string)
 
 		r.Chart = &chart.Chart{
