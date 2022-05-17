@@ -34,6 +34,19 @@ func GetK8sTree(objects []interface{}) ([]ObjectsTree, error) {
 		remainingUnstructuredObjects = subtractUnstructuredObjects(remainingUnstructuredObjects, foundChildren)
 		objectsTrees = append(objectsTrees, sourceParentTree)
 	}
+
+	var parentTree ObjectsTree
+	for _, remainingUnstructuredObject := range remainingUnstructuredObjects {
+		remainingObj := ObjectsTree{
+			UID:    string(remainingUnstructuredObject.GetUID()),
+			Kind:   remainingUnstructuredObject.GetKind(),
+			Object: remainingUnstructuredObject.Object,
+			Name:   remainingUnstructuredObject.GetName(),
+		}
+		parentTree, foundChildren = createTrees(remainingObj, remainingUnstructuredObjects)
+		remainingUnstructuredObjects = subtractUnstructuredObjects(remainingUnstructuredObjects, foundChildren)
+		objectsTrees = append(objectsTrees, parentTree)
+	}
 	return objectsTrees, nil
 }
 
