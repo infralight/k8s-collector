@@ -31,7 +31,8 @@ func ArgoFilter(ctx context.Context, data map[string][]interface{}) error {
 		}
 
 		source, _ := funk.Get(meta, "status.sourceType").(string)
-		if source != "Helm" {
+		source = strings.ToLower(source)
+		if source != "" && source != "helm" && source != "directory" {
 			continue
 		}
 
