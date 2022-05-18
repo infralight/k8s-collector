@@ -3,42 +3,24 @@ kind: ConfigMap
 metadata:
   name: {{ .Release.Name }}-config
 data:
-  endpoint: {{ .Values.apiEndpoint }}
+{{ if .Values.apiEndpoint }}
+  endpoint: {{ quote .Values.apiEndpoint }}
+{{ end }}
   collector.watchNamespace: default
   collector.ignoreNamespaces: |
     kube-system
-  collector.resources.replicationControllers: "true"
-  collector.resources.services: "true"
-  collector.resources.serviceAccounts: "true"
-  collector.resources.pods: "true"
-  collector.resources.nodes: "true"
-  collector.resources.persistentVolumes: "true"
-  collector.resources.persistentVolumeClaims: "true"
-  collector.resources.namespaces: "true"
-  collector.resources.configMaps: "true"
-  collector.resources.deployments: "true"
-  collector.resources.daemonSets: "true"
-  collector.resources.replicaSets: "true"
-  collector.resources.statefulSets: "true"
-  collector.resources.jobs: "true"
-  collector.resources.cronJobs: "true"
-  collector.resources.ingresses: "true"
-  collector.resources.clusterRoles: "true"
-  collector.resources.componentStatuses: "false"
-  collector.resources.flowSchemas: "false"
-  collector.resources.podMetrics: "false"
-{{- if .Values.collectEvents}}
-  collector.resources.events: "true"
-{{- else }}
-  collector.resources.events: "false"
-{{- end }}
-{{- if .Values.collectSecrets}}
-  collector.resources.secrets: "true"
-{{- else }}
-  collector.resources.secrets: "false"
-{{- end }}
-{{- if .Values.overrideUniqueClusterId}}
-  collector.overrideUniqueClusterId: "true"
-{{- else }}
-  collector.overrideUniqueClusterId: "false"
-{{- end }}
+  collector.overrideUniqueClusterId: {{ if .Values.overrideUniqueClusterId }}"true"{{ else }}"false"{{ end }}
+  collector.resources: |
+    {{ $resources := list "apiservices" "analysistemplates" "clusteranalysistemplates" "clusterroles" "clusterrolebindings" "configmaps" "controllerrevisions" "cronjobs" "csinodes" "customresourcedefinitions" "daemonsets" "deployments" "endpoints" "endpointslices" "flowschemas" "ingresses" "jobs" "leases" "namespaces" "networkpolicies" "nodes" "persistentvolumeclaims" "persistentvolumes" "pods" "priorityclasses" "prioritylevelconfigurations" "replicasets" "replicationcontrollers" "roles" "rolebindings" "rollouts" "rollouts/finalizers" "rollouts/status" "serviceaccounts" "services" "services/status" "statefulsets" "storageclasses" }}
+    {{- range $i, $name := $resources }}
+      {{- if has $name $.Values.removeTypes }}
+        {{- continue -}}
+      {{- end }}
+      {{ $name -}}
+    {{ end -}}
+    {{- range $i, $name := $.Values.addTypes }}
+      {{ $name -}}
+    {{ end -}}
+    {{- if and ($.Values.collectSecrets) (not (has "secrets" $.Values.addTypes)) }}
+      secrets
+    {{ end -}}

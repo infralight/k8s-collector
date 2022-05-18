@@ -76,32 +76,6 @@ func (f *Collector) Run(ctx context.Context, conf *config.Config) (
 ) {
 	log.Debug().Msg("Starting collect Kubernetes objects")
 
-	allowList := map[string]bool{
-		"ClusterRole":           conf.FetchClusterRoles,
-		"ConfigMap":             conf.FetchConfigMaps,
-		"CronJob":               conf.FetchCronJobs,
-		"Event":                 conf.FetchEvents,
-		"DaemonSet":             conf.FetchDaemonSets,
-		"Deployment":            conf.FetchDeployments,
-		"Ingress":               conf.FetchIngresses,
-		"Job":                   conf.FetchJobs,
-		"Namespace":             conf.FetchNamespaces,
-		"Node":                  conf.FetchNodes,
-		"ReplicaSet":            conf.FetchReplicaSets,
-		"ReplicationController": conf.FetchReplicationControllers,
-		"ServiceAccount":        conf.FetchServiceAccounts,
-		"Service":               conf.FetchServices,
-		"Secret":                conf.FetchSecrets,
-		"StatefulSet":           conf.FetchStatefulSets,
-		"PersistentVolumeClaim": conf.FetchPersistentVolumeClaims,
-		"PersistentVolume":      conf.FetchPersistentVolumes,
-		"Pod":                   conf.FetchPods,
-		"ComponentStatus":       conf.FetchComponentStatuses,
-		"FlowSchema":            conf.FetchFlowSchemas,
-		"PodMetrics":            conf.FetchPodMetrics,
-		"Application":           conf.FetchArgoApplications,
-	}
-
 	apiResourcesList, err := f.api.Discovery().ServerPreferredResources()
 	if err != nil {
 		return "k8s_objects", nil, fmt.Errorf("failed receiving Kubernetes resources: %w", err)
@@ -111,55 +85,78 @@ func (f *Collector) Run(ctx context.Context, conf *config.Config) (
 		for _, resource := range apiResource.APIResources {
 			var uri string
 			if apiResource.GroupVersion == "v1" && apiResource.APIVersion == "" {
-				// The URL for for api v1 is different from the external apis
+				// The URL for api v1 is different from the external apis
 				uri = "api/v1"
 			} else {
 				uri = fmt.Sprintf("apis/%s", apiResource.GroupVersion)
 			}
-			toFetch, ok := allowList[resource.Kind]
-			// CRD doesn't appear in the allowed list
-			isCRD := !ok
+
+			toFetch := conf.AllowedResources[resource.Name]
+
+			isCRD := !isCoreAPIGroup(apiResource.GroupVersion)
+
 			if !toFetch && !isCRD {
 				// Skipping a resource due to policy
-				log.Warn().Str("ApiVersion", uri).Str("kind", resource.Kind).
+				log.Warn().
+					Str("ApiVersion", uri).
+					Str("kind", resource.Kind).
 					Msg("Ignoring resources due to policy")
 				continue
 			}
+
 			if !strings.Contains(resource.Verbs.String(), "list") {
-				log.Debug().Str("ApiVersion", uri).Str("kind", resource.Kind).
+				log.Debug().
+					Str("ApiVersion", uri).
+					Str("Kind", resource.Kind).
 					Msg("Ignoring resources due to policy")
 				continue
 			}
+
 			itemsResponse := f.api.Discovery().
 				RESTClient().
 				Get().
 				RequestURI(uri).
 				Resource(resource.Name).
 				Do(ctx)
+
 			var responseCode int
 			itemsResponse.StatusCode(&responseCode)
 			if responseCode != 200 {
-				log.Err(itemsResponse.Error()).Str("ApiVersion", uri).Str("kind", resource.Kind).
+				log.Warn().
+					Err(itemsResponse.Error()).
+					Str("ApiVersion", uri).
+					Str("kind", resource.Kind).
 					Msg("Error receiving response while listing resources")
 				continue
 			}
+
 			type ResourcesListResponse struct {
 				Kind       string                   `json:"kind"`
 				APIVersion string                   `json:"apiVersion"`
 				Items      []map[string]interface{} `json:"items"`
 			}
+
 			var itemsDict = ResourcesListResponse{}
+
 			responseData, err := itemsResponse.Raw()
 			if err != nil {
-				log.Err(err).Str("ApiVersion", uri).Str("kind", resource.Kind).
+				log.Warn().
+					Err(err).
+					Str("ApiVersion", uri).
+					Str("kind", resource.Kind).
 					Msg("Error reading response while listing resources")
 				continue
 			}
+
 			err = json.Unmarshal(responseData, &itemsDict)
 			if err != nil {
-				log.Err(err).Str("ApiVersion", uri).Str("kind", resource.Kind).
+				log.Warn().
+					Err(err).
+					Str("ApiVersion", uri).
+					Str("kind", resource.Kind).
 					Msg("Failed loading json resources from response")
 			}
+
 			for _, item := range itemsDict.Items {
 				item["apiVersion"] = apiResource.GroupVersion
 				item["kind"] = resource.Kind
@@ -168,12 +165,23 @@ func (f *Collector) Run(ctx context.Context, conf *config.Config) (
 					Object: item,
 				})
 			}
-			log.Debug().Int("items", len(itemsDict.Items)).Str("ApiVersion", uri).
-				Str("kind", resource.Kind).Msg("Found items for resource")
 
+			log.Debug().
+				Int("items", len(itemsDict.Items)).
+				Str("ApiVersion", uri).
+				Str("kind", resource.Kind).
+				Msg("Found items for resource")
 		}
 	}
-	log.Info().Int("items", len(objects)).Int("apis", len(apiResourcesList)).
+
+	log.Info().
+		Int("items", len(objects)).
+		Int("apis", len(apiResourcesList)).
 		Msg("Finished Kubernetes cluster fetching")
+
 	return "k8s_objects", objects, nil
+}
+
+func isCoreAPIGroup(groupVersion string) bool {
+	return !strings.Contains(groupVersion, ".") || strings.Contains(groupVersion, ".k8s.io")
 }

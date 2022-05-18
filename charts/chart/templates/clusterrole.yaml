@@ -3,17 +3,6 @@ apiVersion: rbac.authorization.k8s.io/v1
 metadata:
   name: {{ .Values.clusterRole.name }}
 
-{{- if or .Values.fetchEverything .Values.collectSecrets }}
-rules:
-  - verbs:
-      - get
-      - list
-      - watch
-    apiGroups:
-      - '*'
-    resources:
-      - '*'
-{{- else }}
 rules:
   - apiGroups:
       - '*'
@@ -22,35 +11,20 @@ rules:
       - list
       - watch
     resources:
-      - clusterroles
-      - ingresses
-      - networkpolicies
-      - daemonsets
-      - deployments
-      - replicasets
-      - cronjobs
-      - jobs
-      - statefulsets
-      - namespaces
-      - nodes
-      - events
-      - services/status
-      - services
-      - serviceaccounts
-      - replicationcontrollers
-      - pods
-      - persistentvolumeclaims
-      - persistentvolumes
-      - configmaps
-      - endpoints
-      - storageclasses
-      - customresourcedefinitions
-      - rollouts
-      - rollouts/status
-      - rollouts/finalizers
-      - analysistemplates
-      - clusteranalysistemplates
-      {{- if or .Values.collectArgoApplications }}
-      - applications
-      {{- end }}
-  {{- end }}
+{{- if .Values.fetchEverything }}
+      - '*'
+{{ else -}}
+      {{ $resources := list "apiservices" "analysistemplates" "clusteranalysistemplates" "clusterroles" "clusterrolebindings" "configmaps" "controllerrevisions" "cronjobs" "csinodes" "customresourcedefinitions" "daemonsets" "deployments" "endpoints" "endpointslices" "flowschemas" "ingresses" "jobs" "leases" "namespaces" "networkpolicies" "nodes" "persistentvolumeclaims" "persistentvolumes" "pods" "priorityclasses" "prioritylevelconfigurations" "replicasets" "replicationcontrollers" "roles" "rolebindings" "rollouts" "rollouts/finalizers" "rollouts/status" "serviceaccounts" "services" "services/status" "statefulsets" "storageclasses" }}
+      {{- range $i, $name := $resources }}
+        {{- if has $name $.Values.removeTypes }}
+          {{- continue -}}
+        {{- end }}
+      - {{ $name }}
+      {{ end -}}
+      {{- range $i, $name := $.Values.addTypes }}
+      - {{ $name }}
+      {{ end -}}
+      {{- if and ($.Values.collectSecrets) (not (has "secrets" $.Values.addTypes)) }}
+      - secrets
+      {{ end -}}
+{{ end -}}
