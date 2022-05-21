@@ -191,7 +191,7 @@ func LoadConfig(
         "/",
     )
     if conf.UseSpecificLoginRoute == "" {
-        conf.LoginEndpoint = "http://stag.external.api.infralight.cloud/"
+        conf.LoginEndpoint = "https://stag.external.api.infralight.cloud/"
     } else {
         conf.LoginEndpoint = conf.UseSpecificLoginRoute
     }
