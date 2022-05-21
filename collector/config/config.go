@@ -181,7 +181,7 @@ func LoadConfig(
 		"/",
 	)
 	if conf.UseSpecificRoute == "" {
-		conf.Endpoint = "http://k8s-api.stag.external.api.infralight.cloud/"
+		conf.Endpoint = "http://k8s-api.prod.external.api.infralight.cloud/"
 	} else {
 		conf.Endpoint = conf.UseSpecificRoute
 	}
@@ -191,7 +191,7 @@ func LoadConfig(
         "/",
     )
     if conf.UseSpecificLoginRoute == "" {
-        conf.LoginEndpoint = "https://stag.external.api.infralight.cloud/"
+        conf.LoginEndpoint = "https://prod.external.api.infralight.cloud/"
     } else {
         conf.LoginEndpoint = conf.UseSpecificLoginRoute
     }
