@@ -67,8 +67,14 @@ type Config struct {
 	// UseSpecificRoute is a URL to override the firefly URL
 	UseSpecificRoute string
 
+	// UseSpecificRoute is a URL to override the firefly URL
+	UseSpecificLoginRoute string
+
 	// Endpoint is the URL to the Infralight App Server
 	Endpoint string
+
+	// LoginEndpoint is the URL to the Infralight login service
+	LoginEndpoint string
 
 	// Namespace is the Kubernets namespace we're collecting data from (if empty,
 	// all namespaces are collected)
@@ -175,10 +181,20 @@ func LoadConfig(
 		"/",
 	)
 	if conf.UseSpecificRoute == "" {
-		conf.Endpoint = "https://prod.external.api.infralight.cloud"
+		conf.Endpoint = "https://k8s-api.prod.external.api.infralight.cloud/"
 	} else {
 		conf.Endpoint = conf.UseSpecificRoute
 	}
+
+    conf.UseSpecificLoginRoute = strings.TrimSuffix(
+        parseOne(conf.etcConfig("useSpecificLoginRoute"), ""),
+        "/",
+    )
+    if conf.UseSpecificLoginRoute == "" {
+        conf.LoginEndpoint = "https://prod.external.api.infralight.cloud/"
+    } else {
+        conf.LoginEndpoint = conf.UseSpecificLoginRoute
+    }
 
 	conf.AccessKey = accessKey
 	conf.SecretKey = secretKey
