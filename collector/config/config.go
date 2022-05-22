@@ -181,7 +181,7 @@ func LoadConfig(
 		"/",
 	)
 	if conf.UseSpecificRoute == "" {
-		conf.Endpoint = "http://k8s-api.prod.external.api.infralight.cloud/"
+		conf.Endpoint = "https://k8s-api.prod.external.api.infralight.cloud/"
 	} else {
 		conf.Endpoint = conf.UseSpecificRoute
 	}
