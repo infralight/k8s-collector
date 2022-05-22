@@ -213,7 +213,7 @@ func (f *Collector) authenticate() (accessToken string, err error) {
 		Type      string `json:"token_type"`
 	}
 
-	err = requests.NewClient(f.conf.LoginEndpoint).
+	err = requests.NewClient(f.conf.Endpoint).
 		NewRequest("POST", "/account/access_keys/login").
 		JSONBody(map[string]interface{}{
 			"accessKey": f.conf.AccessKey,
