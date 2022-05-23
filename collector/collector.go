@@ -105,7 +105,7 @@ func (f *Collector) Run(ctx context.Context) (err error) {
 		return fmt.Errorf("invalid cluster ID, must match %s", clusterIDRegex)
 	}
 
-	f.log.Info().Str("Firefly Endpoint", f.conf.Endpoint).Msg("Starting")
+	f.log.Info().Str("Firefly Login Endpoint", f.conf.LoginEndpoint).Str("Firefly Endpoint", f.conf.Endpoint).Msg("Starting")
 
 	// authenticate with the Infralight API
 	if f.conf.DryRun {
