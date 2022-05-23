@@ -322,5 +322,5 @@ func (fs *localFS) Open(name string) (fs.File, error) {
 }
 
 func isOldEndpoint(endpoint string) bool {
-	return endpoint == "prodapi.infralight.cloud/api"
+	return endpoint == "https://prodapi.infralight.cloud/api"
 }
