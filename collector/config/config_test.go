@@ -10,12 +10,13 @@ import (
 	"github.com/rs/zerolog"
 )
 
-func Test_loadConfig(t *testing.T) {
+func TestLoadConfig(t *testing.T) {
 	// Create a nop logger
 	logger := zerolog.Nop()
 
 	var tests = []struct {
 		name      string
+		moreInfo  []string
 		accessKey string
 		secretKey string
 		etcFiles  *fstest.MapFS
@@ -23,122 +24,53 @@ func Test_loadConfig(t *testing.T) {
 		expConfig Config
 	}{
 		{
-			name: "no secret",
-			etcFiles: &fstest.MapFS{
-				"etc/config/endpoint": &fstest.MapFile{Data: []byte("http://localhost:5000/api\n")},
-			},
-			expConfig: Config{
-				Log:                         &logger,
-				DryRun:                      true,
-				ConfigDir:                   DefaultConfigDir,
-				AccessKey:                   "",
-				SecretKey:                   "",
-				Endpoint:                    "https://prod.external.api.infralight.cloud",
-				FetchEvents:                 false,
-				FetchConfigMaps:             true,
-				FetchReplicationControllers: true,
-				FetchSecrets:                false,
-				FetchServices:               true,
-				FetchServiceAccounts:        true,
-				FetchPods:                   true,
-				FetchNodes:                  true,
-				FetchPersistentVolumes:      true,
-				FetchPersistentVolumeClaims: true,
-				FetchNamespaces:             true,
-				FetchDeployments:            true,
-				FetchDaemonSets:             true,
-				FetchReplicaSets:            true,
-				FetchStatefulSets:           true,
-				FetchJobs:                   true,
-				FetchCronJobs:               true,
-				FetchIngresses:              true,
-				FetchClusterRoles:           true,
-				FetchArgoApplications:       true,
-				OverrideUniqueClusterId:     false,
-				PageSize:                    500,
-				MaxGoRoutines:               50,
-			},
+			name:   "When authentication keypair is missing, loadConfig should fail",
+			expErr: ErrAccessKeys,
 		},
 		{
-			name:      "no config",
+			name: "When configuration is provided, it should be parsed successfully",
+			moreInfo: []string{
+				"If an API endpoint is provided, a trailing slash should be trimmed",
+			},
 			accessKey: "access",
 			secretKey: "secret",
 			etcFiles: &fstest.MapFS{
-				"etc/config/endpoint": &fstest.MapFile{Data: []byte("http://localhost:5000/api\n")},
+				"etc/config/endpoint": &fstest.MapFile{
+					Data: []byte("http://localhost:5000/\n"),
+				},
+				"etc/config/collector.watchNamespace": &fstest.MapFile{
+					Data: []byte("namespace"),
+				},
+				"etc/config/collector.ignoreNamespaces": &fstest.MapFile{
+					Data: []byte("one\ntwo\n\n"),
+				},
+				"etc/config/collector.resources": &fstest.MapFile{
+					Data: []byte(
+						"\nconfigmaps\nreplicationcontrollers\nsecrets\nservices\nserviceaccounts\npods\nnodes\napplications\n",
+					),
+				},
 			},
 			expConfig: Config{
-				Log:                         &logger,
-				ConfigDir:                   DefaultConfigDir,
-				AccessKey:                   "access",
-				SecretKey:                   "secret",
-				Endpoint:                    "https://prod.external.api.infralight.cloud",
-				FetchEvents:                 false,
-				FetchConfigMaps:             true,
-				FetchReplicationControllers: true,
-				FetchSecrets:                false,
-				FetchServices:               true,
-				FetchServiceAccounts:        true,
-				FetchPods:                   true,
-				FetchNodes:                  true,
-				FetchPersistentVolumes:      true,
-				FetchPersistentVolumeClaims: true,
-				FetchNamespaces:             true,
-				FetchDeployments:            true,
-				FetchDaemonSets:             true,
-				FetchReplicaSets:            true,
-				FetchStatefulSets:           true,
-				FetchJobs:                   true,
-				FetchCronJobs:               true,
-				FetchIngresses:              true,
-				FetchClusterRoles:           true,
-				FetchArgoApplications:       true,
-				OverrideUniqueClusterId:     false,
-				PageSize:                    500,
-				MaxGoRoutines:               50,
-			},
-		},
-		{
-			name:      "config",
-			accessKey: "access",
-			secretKey: "secret",
-			etcFiles: &fstest.MapFS{
-				"etc/config/endpoint":                        &fstest.MapFile{Data: []byte("http://localhost:5000/api\n")},
-				"etc/config/collector.watchNamespace":        &fstest.MapFile{Data: []byte("namespace")},
-				"etc/config/collector.ignoreNamespaces":      &fstest.MapFile{Data: []byte("one\ntwo\n\n")},
-				"etc/config/collector.resources.secrets":     &fstest.MapFile{Data: []byte("\ntrue   \n")},
-				"etc/config/collector.resources.deployments": &fstest.MapFile{Data: []byte("false\n")},
-			},
-			expConfig: Config{
-				Log:                         &logger,
-				ConfigDir:                   DefaultConfigDir,
-				AccessKey:                   "access",
-				SecretKey:                   "secret",
-				Endpoint:                    "https://prod.external.api.infralight.cloud",
-				Namespace:                   "namespace",
-				IgnoreNamespaces:            []string{"one", "two"},
-				FetchEvents:                 false,
-				FetchConfigMaps:             true,
-				FetchReplicationControllers: true,
-				FetchSecrets:                true,
-				FetchServices:               true,
-				FetchServiceAccounts:        true,
-				FetchPods:                   true,
-				FetchNodes:                  true,
-				FetchPersistentVolumes:      true,
-				FetchPersistentVolumeClaims: true,
-				FetchNamespaces:             true,
-				FetchDeployments:            false,
-				FetchDaemonSets:             true,
-				FetchReplicaSets:            true,
-				FetchStatefulSets:           true,
-				FetchJobs:                   true,
-				FetchCronJobs:               true,
-				FetchIngresses:              true,
-				FetchClusterRoles:           true,
-				FetchArgoApplications:       true,
-				OverrideUniqueClusterId:     false,
-				PageSize:                    500,
-				MaxGoRoutines:               50,
+				Log:              &logger,
+				ConfigDir:        DefaultConfigDir,
+				AccessKey:        "access",
+				SecretKey:        "secret",
+				Endpoint:         "http://localhost:5000",
+				Namespace:        "namespace",
+				IgnoreNamespaces: []string{"one", "two"},
+				AllowedResources: map[string]bool{
+					"configmaps":             true,
+					"replicationcontrollers": true,
+					"secrets":                true,
+					"services":               true,
+					"serviceaccounts":        true,
+					"pods":                   true,
+					"nodes":                  true,
+					"applications":           true,
+				},
+				OverrideUniqueClusterId: false,
+				PageSize:                500,
+				MaxGoRoutines:           50,
 			},
 		},
 	}
@@ -161,7 +93,7 @@ func Test_loadConfig(t *testing.T) {
 			}
 
 			// Load collector configuration
-			conf, err := LoadConfig(&logger, memFs, "", len(test.accessKey) == 0)
+			conf, err := LoadConfig(&logger, memFs, "", false)
 			if test.expErr != nil {
 				assert.MustNotBeNil(t, err, "error must not be nil")
 				assert.True(t, errors.Is(err, test.expErr), "error must match")

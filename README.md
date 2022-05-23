@@ -4,16 +4,17 @@
 
 <!-- vim-markdown-toc GFM -->
 
-* [Overview](#overview)
-* [Quick Start](#quick-start)
-* [Configuration](#configuration)
-* [Development](#development)
-    * [Requirements](#requirements)
-    * [Server-Side Notes](#server-side-notes)
-    * [Quick Start](#quick-start-1)
-    * [Unit Tests and Static Code Analysis](#unit-tests-and-static-code-analysis)
-    * [Updating the Helm Chart](#updating-the-helm-chart)
-* [License](#license)
+- [Overview](#overview)
+- [Quick Start](#quick-start)
+- [Configuration](#configuration)
+- [Development](#development)
+  - [Requirements](#requirements)
+  - [Server-Side Notes](#server-side-notes)
+  - [Quick Start](#quick-start-1)
+  - [Unit Tests and Static Code Analysis](#unit-tests-and-static-code-analysis)
+  - [Updating the Helm Chart](#updating-the-helm-chart)
+  - [Adding Collection of More Kubernetes Resource Types](#adding-collection-of-more-kubernetes-resource-types)
+- [License](#license)
 
 <!-- vim-markdown-toc -->
 
@@ -35,17 +36,15 @@ given time without having to restart or add triggering capabilities to a
 Kubernetes [Deployment](https://kubernetes.io/docs/concepts/workloads/controllers/deployment/).
 
 The collector collects various objects from the Kubernetes cluster and sends them
-as-is to Infralight. Currently, the set of object types collected is hard-coded,
-but logic may be added to the collector to receive instructions from Infralight
-to fetch more objects, or to use the Go client's [discovery](https://pkg.go.dev/k8s.io/client-go@v1.5.2/1.5/discovery) library
-to fetch objects of other types.
+as-is to Infralight. There is a default list of resource types the collector
+fetches, to which more types can be added (or removed) via configuration.
 
 ## Quick Start
 
 Infralight's Kubernetes Collector requires:
 
-* [Kubernetes](https://kubernetes.io/) v1.15+
-* [Helm](https://helm.sh/) v3.5+
+- [Kubernetes](https://kubernetes.io/) v1.15+
+- [Helm](https://helm.sh/) v3.5+
 
 To start using the collector, follow these simple steps:
 
@@ -54,14 +53,13 @@ To start using the collector, follow these simple steps:
 2. Install the collector on the cluster using [Helm](https://helm.sh/), with the
    data returned from the wizard:
 
-    ```sh
-    helm repo add infralight https://infralight.github.io/k8s-collector
-    helm install infralight infralight/infralight-k8s-collector \
-        --set accessKey=<access_key> \
-        --set secretKey=<secret_key> \
-        --set apiEndpoint=<api_endpoint> \
-        --set clusterId=<cluster_id>
-    ```
+   ```sh
+   helm repo add infralight https://infralight.github.io/k8s-collector
+   helm install infralight infralight/infralight-k8s-collector \
+       --set accessKey=<access_key> \
+       --set secretKey=<secret_key> \
+       --set clusterId=<cluster_id>
+   ```
 
 The collector's OCI-compliant Docker image is [hosted in Docker Hub](https://hub.docker.com/r/infralightio/k8s-collector). The image is
 built from a [Dockerfile](Dockerfile) that uses an Alpine-based Go image
@@ -73,7 +71,7 @@ The image is named `infralightio/k8s-collector`.
 
 ## Configuration
 
-Please review the [chart/values.yaml](chart/values.yaml) file for a list of
+Please review the [charts/chart/values.yaml](values.yaml) file for a list of
 configuration options that can be modified when installing the Helm Chart.
 You may wish to modify the "schedule" setting, which controls the schedule for
 the collector's execution. By default, the collector is executed once every 15
@@ -99,10 +97,23 @@ Kubernetes [ConfigMap](https://kubernetes.io/docs/concepts/configuration/configm
 supported are not exposed via the chart's values file, but the resulting ConfigMap
 can be manually modified, if necessary.
 
-Note that by default, secrets are _not_ collected, but all other supported object types
-will. See [here](https://github.com/infralight/k8s-collector/blob/main/collector/config.go#L81) for a list of supported configuration options and their
-default values. To enable collection of secrets, provide `--set collectSecrets=true`
-when installing the chart.
+The list of resource types that are collected by the collector can be viewed
+in the `DefaultResourceTypes` variable in [collector/config/config.go](collector/config/config.go).
+The collector will also collect custom resources (CRDs), assuming it is provided
+permission to do so. You can remove or add resource types to the list by
+providing the `addTypes` and `removeTypes` values, which accept lists:
+
+```sh
+helm install infralight infralight/infralight-k8s-collector \
+    --set accessKey=<access_key> \
+    --set secretKey=<secret_key> \
+    --set clusterId=<cluster_id> \
+    --set "addTypes={secrets,applications}" \
+    --set "removeTypes={configMaps}"
+```
+
+Note that "secrets" permission is required in order for the collector to collect
+information about Helm v3 releases install directly via `helm`.
 
 ## Development
 
@@ -112,12 +123,12 @@ use `minikube` for local development.
 
 ### Requirements
 
-* [Go](https://golang.org/) v1.16+
-* [Docker](https://www.docker.com/) v20.10+
-* [minikube](https://minikube.sigs.k8s.io/docs/) v1.18+
-* [kubectl](https://kubernetes.io/docs/tasks/tools/#kubectl) v1.18+
-* [Helm](https://helm.sh/) v3.5+
-* [golangci-lint](https://golangci-lint.run/) v1.35+
+- [Go](https://golang.org/) v1.16+
+- [Docker](https://www.docker.com/) v20.10+
+- [minikube](https://minikube.sigs.k8s.io/docs/) v1.18+
+- [kubectl](https://kubernetes.io/docs/tasks/tools/#kubectl) v1.18+
+- [Helm](https://helm.sh/) v3.5+
+- [golangci-lint](https://golangci-lint.run/) v1.35+
 
 ### Server-Side Notes
 
@@ -132,10 +143,10 @@ The JSON format of each request is as follows:
 
 ```json
 {
-    "objects": [
-        { "kind": "Pod", "metadata": { "name": "bla", "namespace": "default" } },
-        { "kind": "CronJob", "metadata": { "name": "bla", "namespace": "default" } }
-    ]
+  "objects": [
+    { "kind": "Pod", "metadata": { "name": "bla", "namespace": "default" } },
+    { "kind": "CronJob", "metadata": { "name": "bla", "namespace": "default" } }
+  ]
 }
 ```
 
@@ -151,48 +162,50 @@ a [204 No Content](https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/204)
 1. Make sure you have the [App Server](https://github.com/infralight/app-server) running. Create an access/secret keypair
    through the User Management page of the dashboard.
 2. Start minikube on top of Docker:
-    ```sh
-    minikube start --driver=docker
-    ```
+   ```sh
+   minikube start --driver=docker
+   ```
 3. Load environment variables so the Docker client works against the local
    `minikube` Docker daemon:
-    ```sh
-    eval $(minikube docker-env)
-    ```
+   ```sh
+   eval $(minikube docker-env)
+   ```
 4. Build the collector's Docker image:
-    ```sh
-    docker build -t infralightio/k8s-collector:1.0.0 .
-    ```
+   ```sh
+   docker build -t infralightio/k8s-collector:<appVersion in Chart.yaml> .
+   ```
 5. Install the collector via Helm (from the project's root directory):
-    ```sh
-    helm install infralight ./chart \
-        --set accessKey=<access_key> \
-        --set secretKey=<secret_key> \
-        --set apiEndpoint=<api_endpoint>
-    ```
+   ```sh
+   helm install infralight ./charts/chart \
+       --set accessKey=<access_key> \
+       --set secretKey=<secret_key> \
+       --set clusterId=<cluster_id>
+   ```
 6. While the collector will now be automatically triggered every 15 minutes,
    you can also run it out-of-cluster at will, directly from the code. Simply
    execute:
-    ```sh
-    INFRALIGHT_ACCESS_KEY=<accessKey> INFRALIGHT_SECRET_KEY=<secretKey> \
-        go run main.go \
-        -external ~/.kube/config \
-        -config `pwd`/.config \
-        -debug \
-        <clusterId>
-    ```
-    Note that you must first create a ".config" directory in the project root,
-    and at the very least store the API endpoint in a file called ".config/endpoint".
-    Other configuration options can be included as well.
-8. Inspect the job using the command line or the minikube dashboard:
-    ```sh
-    minikube dashboard
-    ```
-9. Cleanup:
-    ```sh
-    helm uninstall infralight
-    eval $(minikube docker-env -u)
-    ```
+   ```sh
+   INFRALIGHT_ACCESS_KEY=<accessKey> INFRALIGHT_SECRET_KEY=<secretKey> \
+       go run main.go \
+       -external ~/.kube/config \
+       -config `pwd`/.config \
+       -debug \
+       <clusterId>
+   ```
+   Note that you must first create a ".config" directory in the project root,
+   and at the very least store the API endpoint in a file called ".config/endpoint".
+   Other configuration options can be included as well.
+   You can also provide the `-dry-run` flag to prevent any communication with
+   Firefly (when used, access and secret keys need not be provided).
+7. Inspect the job using the command line or the minikube dashboard:
+   ```sh
+   minikube dashboard
+   ```
+8. Cleanup:
+   ```sh
+   helm uninstall infralight
+   eval $(minikube docker-env -u)
+   ```
 
 ### Unit Tests and Static Code Analysis
 
@@ -210,19 +223,30 @@ $ go test ./...
 $ golangci-lint run ./...
 ```
 
-### Helm Chart (Automated workflow)
+### Updating the Helm Chart
 
-The project's Helm chart is located within this repository itself, at the charts/chart directory, which is served via GitHub Pages (branch:`gh-pages`).
+The project's Helm chart is located within this repository itself, in the
+charts/chart directory, which is served via GitHub Pages (branch `gh-pages`).
+
 To release a new version of the chart, follow these directions:
 
 1. Perform changes to the collector's source code, if any.
-2. Update charts/chart/Chart.yaml by modifying the values of "version" and "appVersion"
-   to new version numbers.
+2. Update charts/chart/Chart.yaml by modifying the values of "version" and
+   "appVersion" to new version numbers.
 3. Commit and push to the repository.
-4. An automated workflow will trigger, that creates a release & updates the Github Pages at the `gh-pages` branch.
+4. An automated workflow will trigger, that creates a release & updates the
+   GitHub Pages at the `gh-pages` branch.
 5. Manually run the "Build K8s Collector Image" workflow, providing it a tag
    whose value is the new version number you've used in Chart.yaml.
 
+### Adding Collection of More Kubernetes Resource Types
+
+There are three locations where one should add a new resource type, if we want
+to collect more types by default:
+
+1. To the `DefaultResourceTypes` slice in [collector/config/config.go](config.go).
+2. To the `$resources` list in [charts/chart/templates/clusterrole.yaml](clusterrole.yaml).
+3. To the `$resources` list in [charts/chart/templates/configmap.yaml](configmap.yaml).
 
 ## License
 

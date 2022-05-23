@@ -1,10 +1,20 @@
+# clusterId is a unique identifier to give the cluster on which the collector
+# runs.
 clusterId: "default"
+overrideUniqueClusterId: false
+
+# schedule is a cron-like value that defines the schedule for the collector's
+# execution. By default, the collector is executed every 15 minutes.
 schedule: "*/15 * * * *"
 
-apiEndpoint: null
+# accessKey and secretKey are the keypair for authenticating against the
+# Firefly API.
 accessKey: null
 secretKey: null
 
+# image defines the name and pull policy for the OCI image of the collector.
+# By default, the tag defaults to the appVersion value in the chart. You can
+# set a specific tag via the "tag" field.
 image:
   repository: infralightio/k8s-collector
   pullPolicy: Always
@@ -24,8 +34,23 @@ resources:
     cpu: "1.0"
     memory: "2048Mi"
 
-collectSecrets: false
-collectEvents: false
-collectArgoApplications: true
-overrideUniqueClusterId: false
+# apiEndpoint is the URL to Firefly's API. Leave empty unless you have a
+# specific reason to change this.
+apiEndpoint: ""
+
+# fetchEverything is a boolean value indicating whether to allow Firefly to
+# fetch all Kubernetes resource types
 fetchEverything: true
+
+# removeTypes accepts a list of resource types that should be removed from the
+# default list of allowed resources.
+removeTypes: []
+
+# addTypes accepts a list of resource types that should be added to the default
+# list of allowed resources. This is mostly useful for CRDs.
+addTypes: []
+
+# DEPRECATED: collectSecrets is a boolean value indicating whether the collector
+# should collect secrets from the cluster. This value is deprecated in favor of
+# the addTypes value.
+collectSecrets: false

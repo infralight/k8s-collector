@@ -23,6 +23,9 @@ const (
 	// DefaultConfigDir is the path to the default directory where configuration
 	// files (generally mounted from a Kubernetes ConfigMap) must be present.
 	DefaultConfigDir = "/etc/config"
+
+	// DefaultFireflyAPI is the default URL for Firefly's API
+	DefaultFireflyAPI = "https://prod.external.api.infralight.cloud"
 )
 
 var (
@@ -34,6 +37,49 @@ var (
 	// missing an endpoint setting (endpoint is the URL to the Infralight App
 	// Server).
 	ErrEndpoint = errors.New("Infralight endpoint must be provided")
+
+	// DefaultResourceTypes is the list of Kubernetes resources that are
+	// to be collected by default (i.e. if there is no configuration at all)
+	DefaultResourceTypes = []string{
+		"apiservices",
+		"analysistemplates",
+		"clusteranalysistemplates",
+		"clusterroles",
+		"clusterrolebindings",
+		"configmaps",
+		"controllerrevisions",
+		"csinodes",
+		"cronjobs",
+		"customresourcedefinitions",
+		"daemonsets",
+		"deployments",
+		"endpoints",
+		"endpointslices",
+		"flowschemas",
+		"ingresses",
+		"jobs",
+		"leases",
+		"namespaces",
+		"networkpolicies",
+		"nodes",
+		"persistentvolumeclaims",
+		"persistentvolumes",
+		"pods",
+		"priorityclasses",
+		"prioritylevelconfigurations",
+		"replicasets",
+		"replicationcontrollers",
+		"roles",
+		"rolebindings",
+		"rollouts",
+		"rollouts/finalizers",
+		"rollouts/status",
+		"serviceaccounts",
+		"services",
+		"services/status",
+		"statefulsets",
+		"storageclasses",
+	}
 )
 
 // Config represents configuration to the collector library. It is shared
@@ -78,56 +124,16 @@ type Config struct {
 	// account when Namespace is empty)
 	IgnoreNamespaces []string
 
-	// FetchEvents is a boolean indicating whether to collect Kubernetes Events
-	FetchEvents bool
-	// FetchConfigMaps is a boolean indicating whether to collect Kubernetes ConfigMaps
-	FetchConfigMaps bool
-	// FetchReplicationControllers is a boolean indicating whether to collect Kubernetes ReplicationControllers
-	FetchReplicationControllers bool
-	// FetchSecrets is a boolean indicating whether to collect Kubernetes Secrets
-	FetchSecrets bool
-	// FetchServices is a boolean indicating whether to collect Kubernetes Services
-	FetchServices bool
-	// FetchServiceAccounts is a boolean indicating whether to collect Kubernetes ServiceAccounts
-	FetchServiceAccounts bool
-	// FetchPods is a boolean indicating whether to collect Kubernetes Pods
-	FetchPods bool
-	// FetchNodes is a boolean indicating whether to collect Kubernetes Nodes
-	FetchNodes bool
-	// FetchPersistentVolumes is a boolean indicating whether to collect Kubernetes PersistentVolumes
-	FetchPersistentVolumes bool
-	// FetchPersistentVolumeClaims is a boolean indicating whether to collect Kubernetes PersistentVolumeClaims
-	FetchPersistentVolumeClaims bool
-	// FetchNamespaces is a boolean indicating whether to collect Kubernetes Namespaces
-	FetchNamespaces bool
-	// FetchDeployments is a boolean indicating whether to collect Kubernetes Deployments
-	FetchDeployments bool
-	// FetchDaemonSets is a boolean indicating whether to collect Kubernetes DaemonSets
-	FetchDaemonSets bool
-	// FetchReplicaSets is a boolean indicating whether to collect Kubernetes ReplicaSets
-	FetchReplicaSets bool
-	// FetchStatefulSets is a boolean indicating whether to collect Kubernetes StatefulSets
-	FetchStatefulSets bool
-	// FetchJobs is a boolean indicating whether to collect Kubernetes Jobs
-	FetchJobs bool
-	// FetchCronJobs is a boolean indicating whether to collect Kubernetes CronJobs
-	FetchCronJobs bool
-	// FetchIngresses is a boolean indicating whether to collect Kubernetes Ingresses
-	FetchIngresses bool
-	// FetchFlowSchemas is a boolean indicating whether to collect Kubernetes FlowSchemas
-	FetchFlowSchemas bool
-	// FetchComponentStatuses is a boolean indicating whether to collect Kubernetes ComponentStatuses
-	FetchComponentStatuses bool
-	// FetchPodMetrics is a boolean indicating whether to collect Kubernetes PodMetrics
-	FetchPodMetrics bool
-	// FetchClusterRoles is a boolean indicating whether to collect Kubernetes ClusterRoles
-	FetchClusterRoles bool
-	// FetchArgoApplications is a boolean indicating whether to collect ArgoCD Applications
-	FetchArgoApplications bool
+	// AllowedResources is a list of resource types (named by their "Kind" value)
+	// that the collector is allowed to collect
+	AllowedResources map[string]bool
+
 	// OverrideUniqueClusterId is a boolean indicating whether to override the master url of the Kubernetes integration
 	OverrideUniqueClusterId bool
+
 	// PageSize is an integer for max page size in KB
 	PageSize int
+
 	// MaxGoRoutines is an integer for max goroutines running at ones sending the chunks.
 	MaxGoRoutines int
 }
@@ -170,61 +176,25 @@ func LoadConfig(
 		DryRun:    dryRun,
 	}
 
-	conf.UseSpecificRoute = strings.TrimSuffix(
-		parseOne(conf.etcConfig("useSpecificRoute"), ""),
+	conf.Endpoint = strings.TrimSuffix(
+		parseOne(conf.etcConfig("endpoint"), ""),
 		"/",
 	)
-	if conf.UseSpecificRoute == "" {
-		conf.Endpoint = "https://prod.external.api.infralight.cloud"
-	} else {
-		conf.Endpoint = conf.UseSpecificRoute
+	if conf.Endpoint == "" || isOldEndpoint(conf.Endpoint) {
+		conf.Endpoint = DefaultFireflyAPI
 	}
 
 	conf.AccessKey = accessKey
 	conf.SecretKey = secretKey
 	conf.Namespace = parseOne(conf.etcConfig("collector.watchNamespace"), "")
 	conf.IgnoreNamespaces = parseMultiple(conf.etcConfig("collector.ignoreNamespaces"), nil)
-	conf.FetchEvents = parseBool(conf.etcConfig("collector.resources.events"), false)
-	conf.FetchReplicationControllers = parseBool(
-		conf.etcConfig("collector.resources.replicationControllers"),
-		true,
-	)
-	conf.FetchServices = parseBool(conf.etcConfig("collector.resources.services"), true)
-	conf.FetchServiceAccounts = parseBool(
-		conf.etcConfig("collector.resources.serviceAccounts"),
-		true,
-	)
-	conf.FetchPods = parseBool(conf.etcConfig("collector.resources.pods"), true)
-	conf.FetchNodes = parseBool(conf.etcConfig("collector.resources.nodes"), true)
-	conf.FetchPersistentVolumes = parseBool(
-		conf.etcConfig("collector.resources.persistentVolumes"),
-		true,
-	)
-	conf.FetchPersistentVolumeClaims = parseBool(
-		conf.etcConfig("collector.resources.persistentVolumeClaims"),
-		true,
-	)
-	conf.FetchNamespaces = parseBool(conf.etcConfig("collector.resources.namespaces"), true)
-	conf.FetchConfigMaps = parseBool(conf.etcConfig("collector.resources.configMaps"), true)
-	conf.FetchSecrets = parseBool(conf.etcConfig("collector.resources.secrets"), false)
-	conf.FetchDeployments = parseBool(conf.etcConfig("collector.resources.deployments"), true)
-	conf.FetchDaemonSets = parseBool(conf.etcConfig("collector.resources.daemonSets"), true)
-	conf.FetchReplicaSets = parseBool(conf.etcConfig("collector.resources.replicaSets"), true)
-	conf.FetchStatefulSets = parseBool(conf.etcConfig("collector.resources.statefulSets"), true)
-	conf.FetchJobs = parseBool(conf.etcConfig("collector.resources.jobs"), true)
-	conf.FetchCronJobs = parseBool(conf.etcConfig("collector.resources.cronJobs"), true)
-	conf.FetchIngresses = parseBool(conf.etcConfig("collector.resources.ingresses"), true)
-	conf.FetchComponentStatuses = parseBool(
-		conf.etcConfig("collector.resources.componentStatuses"),
-		false,
-	)
-	conf.FetchFlowSchemas = parseBool(conf.etcConfig("collector.resources.flowSchemas"), false)
-	conf.FetchPodMetrics = parseBool(conf.etcConfig("collector.resources.podMetrics"), false)
-	conf.FetchClusterRoles = parseBool(conf.etcConfig("collector.resources.clusterRoles"), true)
-	conf.FetchArgoApplications = parseBool(
-		conf.etcConfig("collector.resources.argoApplications"),
-		true,
-	)
+
+	conf.AllowedResources = make(map[string]bool)
+	conf.backwardsCompatibilityResources()
+	for _, resource := range parseMultiple(conf.etcConfig("collector.resources"), DefaultResourceTypes) {
+		conf.AllowedResources[resource] = true
+	}
+
 	conf.OverrideUniqueClusterId = parseBool(
 		conf.etcConfig("collector.OverrideUniqueClusterId"),
 		false,
@@ -233,6 +203,20 @@ func LoadConfig(
 	conf.MaxGoRoutines = parseInt(conf.etcConfig("collector.MaxGoRoutines"), 50)
 
 	return conf, nil
+}
+
+func (conf *Config) backwardsCompatibilityResources() {
+	entries, err := fs.ReadDir(conf.FS, conf.ConfigDir)
+	if err != nil {
+		return
+	}
+
+	for _, entry := range entries {
+		if strings.HasPrefix(entry.Name(), "collector.resources.") {
+			name := strings.ToLower(strings.TrimPrefix(entry.Name(), "collector.resources."))
+			conf.AllowedResources[name] = parseBool(conf.etcConfig(entry.Name()), false)
+		}
+	}
 }
 
 // IgnoreNamespace accepts a namespace and returns a boolean value indicating
@@ -324,4 +308,8 @@ type localFS struct{}
 
 func (fs *localFS) Open(name string) (fs.File, error) {
 	return os.Open("/" + name)
+}
+
+func isOldEndpoint(endpoint string) bool {
+	return endpoint == "prodapi.infralight.cloud/api"
 }

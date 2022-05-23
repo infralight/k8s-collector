@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	"os"
 	"regexp"
@@ -58,13 +59,11 @@ type Collector struct {
 
 	// the collector's configuration
 	conf *config.Config
-	log  *zerolog.Logger
 
-	// the data collectors
+	log            *zerolog.Logger
+	client         *requests.HTTPClient
 	dataCollectors []DataCollector
-
-	// the data filters
-	dataFilters []filter.DataFilter
+	dataFilters    []filter.DataFilter
 }
 
 var clusterIDRegex = regexp.MustCompile(`^[a-z0-9-_]+$`)
@@ -112,7 +111,7 @@ func (f *Collector) Run(ctx context.Context) (err error) {
 	if f.conf.DryRun {
 		log.Info().Msg("Skipping authentication due to dry-run")
 	} else {
-		f.accessToken, err = f.authenticate()
+		err = f.authenticate()
 		if err != nil {
 			return fmt.Errorf("failed authenticating with Infralight API: %w", err)
 		}
@@ -206,7 +205,7 @@ func (f *Collector) Run(ctx context.Context) (err error) {
 	return nil
 }
 
-func (f *Collector) authenticate() (accessToken string, err error) {
+func (f *Collector) authenticate() (err error) {
 	var credentials struct {
 		Token     string `json:"access_token"`
 		ExpiresIn int64  `json:"expires_in"`
@@ -221,7 +220,23 @@ func (f *Collector) authenticate() (accessToken string, err error) {
 		}).
 		Into(&credentials).
 		Run()
-	return credentials.Token, err
+	if err != nil {
+		return err
+	}
+
+	f.client = requests.NewClient(f.conf.Endpoint).
+		Header("Authorization", fmt.Sprintf("Bearer %s", credentials.Token)).
+		CompressWith(requests.CompressionAlgorithmGzip).
+		ErrorHandler(func(httpStatus int, contentType string, body io.Reader) error {
+			content, err := io.ReadAll(body)
+			if err != nil {
+				return fmt.Errorf("server returned unexpected status %d", httpStatus)
+			}
+
+			return fmt.Errorf("server returned %d: %q", httpStatus, content)
+		})
+
+	return nil
 }
 
 func (f *Collector) getUniqueClusterId(ctx context.Context) (clusterId string, err error) {
@@ -240,17 +255,15 @@ func (f *Collector) getUniqueClusterId(ctx context.Context) (clusterId string, e
 
 func (f *Collector) startNewFetching(clusterUniqueId string) (fetchingId string, err error) {
 	fetchingId = bson.NewObjectId().Hex()
-	var overrideUniqueClusterId string
+	req := f.client.
+		NewRequest("HEAD", fmt.Sprintf("/integrations/k8s/%s/fetching", f.clusterID)).
+		QueryParam("clusterUniqueId", clusterUniqueId).
+		QueryParam("fetchingId", fetchingId).
+		ExpectedStatus(http.StatusNoContent)
 	if f.conf.OverrideUniqueClusterId {
-		overrideUniqueClusterId = "&overrideUniqueClusterId=1"
+		req.QueryParam("overrideUniqueClusterId", "1")
 	}
-	err = requests.NewClient(f.conf.Endpoint).
-		Header("Authorization", fmt.Sprintf("Bearer %s", f.accessToken)).
-		NewRequest("HEAD", fmt.Sprintf("/integrations/k8s/%s/fetching?clusterUniqueId=%s&fetchingId=%s%s",
-			f.clusterID, clusterUniqueId, fetchingId, overrideUniqueClusterId)).
-		CompressWith(requests.CompressionAlgorithmGzip).
-		ExpectedStatus(http.StatusNoContent).
-		Run()
+	err = req.Run()
 	return fetchingId, err
 }
 
@@ -259,10 +272,8 @@ func (f *Collector) send(data map[string]interface{}) error {
 		Interface("data", data).
 		Msg("Sending collected data to Infralight")
 
-	return requests.NewClient(f.conf.Endpoint).
-		Header("Authorization", fmt.Sprintf("Bearer %s", f.accessToken)).
+	return f.client.
 		NewRequest("POST", fmt.Sprintf("/integrations/k8s/%s/fetching", f.clusterID)).
-		CompressWith(requests.CompressionAlgorithmGzip).
 		ExpectedStatus(http.StatusNoContent).
 		JSONBody(data).
 		Run()
@@ -314,10 +325,11 @@ func (f *Collector) sendK8sObjects(fetchingId string, data []interface{}) error 
 			body := make(map[string]interface{}, 2)
 			body["fetchingId"] = fetchingId
 			body["k8sObjects"] = routineObjects
-			err := requests.NewClient(f.conf.Endpoint).
-				Header("Authorization", fmt.Sprintf("Bearer %s", f.accessToken)).
-				NewRequest("POST", fmt.Sprintf("/integrations/k8s/%s/fetching/objects", f.clusterID)).
-				CompressWith(requests.CompressionAlgorithmGzip).
+			err := f.client.
+				NewRequest(
+					"POST",
+					fmt.Sprintf("/integrations/k8s/%s/fetching/objects", f.clusterID),
+				).
 				ExpectedStatus(http.StatusNoContent).
 				JSONBody(body).
 				Run()
@@ -337,10 +349,8 @@ func (f *Collector) sendK8sObjects(fetchingId string, data []interface{}) error 
 		return err
 	}
 
-	err := requests.NewClient(f.conf.Endpoint).
-		Header("Authorization", fmt.Sprintf("Bearer %s", f.accessToken)).
+	err := f.client.
 		NewRequest("PATCH", fmt.Sprintf("/integrations/k8s/%s/fetching", f.clusterID)).
-		CompressWith(requests.CompressionAlgorithmGzip).
 		ExpectedStatus(http.StatusNoContent).
 		JSONBody(map[string]interface{}{
 			"fetchingId": fetchingId,
@@ -406,10 +416,8 @@ func (f *Collector) sendHelmReleases(
 			body["fetchingId"] = fetchingId
 			body["helmReleases"] = routineObjects
 			body["k8sTypes"] = types
-			err := requests.NewClient(f.conf.Endpoint).
-				Header("Authorization", fmt.Sprintf("Bearer %s", f.accessToken)).
+			err := f.client.
 				NewRequest("POST", fmt.Sprintf("/integrations/k8s/%s/fetching/helm", f.clusterID)).
-				CompressWith(requests.CompressionAlgorithmGzip).
 				ExpectedStatus(http.StatusNoContent).
 				JSONBody(body).
 				Run()
@@ -499,10 +507,8 @@ func (f *Collector) sendK8sTree(fetchingId string, data []k8stree.ObjectsTree) e
 			body := make(map[string]interface{}, 2)
 			body["fetchingId"] = fetchingId
 			body["k8sTrees"] = routineObjects
-			err := requests.NewClient(f.conf.Endpoint).
-				Header("Authorization", fmt.Sprintf("Bearer %s", f.accessToken)).
+			err := f.client.
 				NewRequest("POST", fmt.Sprintf("/integrations/k8s/%s/fetching/tree", f.clusterID)).
-				CompressWith(requests.CompressionAlgorithmGzip).
 				ExpectedStatus(http.StatusNoContent).
 				JSONBody(body).
 				Run()
