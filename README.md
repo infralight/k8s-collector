@@ -4,17 +4,17 @@
 
 <!-- vim-markdown-toc GFM -->
 
-- [Overview](#overview)
-- [Quick Start](#quick-start)
-- [Configuration](#configuration)
-- [Development](#development)
-  - [Requirements](#requirements)
-  - [Server-Side Notes](#server-side-notes)
-  - [Quick Start](#quick-start-1)
-  - [Unit Tests and Static Code Analysis](#unit-tests-and-static-code-analysis)
-  - [Updating the Helm Chart](#updating-the-helm-chart)
-  - [Adding Collection of More Kubernetes Resource Types](#adding-collection-of-more-kubernetes-resource-types)
-- [License](#license)
+* [Overview](#overview)
+* [Quick Start](#quick-start)
+* [Configuration](#configuration)
+* [Development](#development)
+    * [Requirements](#requirements)
+    * [Server-Side Notes](#server-side-notes)
+    * [Quick Start](#quick-start-1)
+    * [Unit Tests and Static Code Analysis](#unit-tests-and-static-code-analysis)
+    * [Updating the Helm Chart](#updating-the-helm-chart)
+    * [Adding Collection of More Kubernetes Resource Types](#adding-collection-of-more-kubernetes-resource-types)
+* [License](#license)
 
 <!-- vim-markdown-toc -->
 
@@ -109,7 +109,7 @@ helm install infralight infralight/infralight-k8s-collector \
     --set secretKey=<secret_key> \
     --set clusterId=<cluster_id> \
     --set "addTypes={secrets,applications}" \
-    --set "removeTypes={configMaps}"
+    --set "removeTypes={configmaps}"
 ```
 
 Note that "secrets" permission is required in order for the collector to collect
