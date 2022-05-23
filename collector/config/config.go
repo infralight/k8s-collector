@@ -25,7 +25,10 @@ const (
 	DefaultConfigDir = "/etc/config"
 
 	// DefaultFireflyAPI is the default URL for Firefly's API
-	DefaultFireflyAPI = "https://prod.external.api.infralight.cloud"
+	DefaultFireflyAPI = "https://k8s-api.prod.external.api.infralight.cloud"
+
+	// DefaultFireflyLoginAPI is the default URL for Firefly's Login API
+	DefaultFireflyLoginAPI = "https://prod.external.api.infralight.cloud"
 )
 
 var (
@@ -110,11 +113,11 @@ type Config struct {
 	// SecretKey is the Infralight secret key
 	SecretKey string
 
-	// UseSpecificRoute is a URL to override the firefly URL
-	UseSpecificRoute string
-
 	// Endpoint is the URL to the Infralight App Server
 	Endpoint string
+
+    // LoginEndpoint is the URL to login Infralight Service
+    LoginEndpoint string
 
 	// Namespace is the Kubernets namespace we're collecting data from (if empty,
 	// all namespaces are collected)
@@ -183,6 +186,14 @@ func LoadConfig(
 	if conf.Endpoint == "" || isOldEndpoint(conf.Endpoint) {
 		conf.Endpoint = DefaultFireflyAPI
 	}
+
+    conf.LoginEndpoint = strings.TrimSuffix(
+        parseOne(conf.etcConfig("loginEndpoint"), ""),
+        "/",
+    )
+    if conf.LoginEndpoint == "" {
+        conf.LoginEndpoint = DefaultFireflyLoginAPI
+    }
 
 	conf.AccessKey = accessKey
 	conf.SecretKey = secretKey
