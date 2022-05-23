@@ -56,6 +56,7 @@ func TestLoadConfig(t *testing.T) {
 				AccessKey:        "access",
 				SecretKey:        "secret",
 				Endpoint:         "http://localhost:5000",
+				LoginEndpoint:    DefaultFireflyLoginAPI,
 				Namespace:        "namespace",
 				IgnoreNamespaces: []string{"one", "two"},
 				AllowedResources: map[string]bool{
