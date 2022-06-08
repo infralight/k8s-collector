@@ -127,7 +127,7 @@ use `minikube` for local development.
 - [Docker](https://www.docker.com/) v20.10+
 - [minikube](https://minikube.sigs.k8s.io/docs/) v1.18+
 - [kubectl](https://kubernetes.io/docs/tasks/tools/#kubectl) v1.18+
-- [Helm](https://helm.sh/) v3.5+
+- [Helm](https://helm.sh/) v3.9.0+
 - [golangci-lint](https://golangci-lint.run/) v1.35+
 
 ### Server-Side Notes
