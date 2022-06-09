@@ -44,7 +44,7 @@ fetches, to which more types can be added (or removed) via configuration.
 Infralight's Kubernetes Collector requires:
 
 - [Kubernetes](https://kubernetes.io/) v1.15+
-- [Helm](https://helm.sh/) v3.5+
+- [Helm](https://helm.sh/) v3.5.0+
 
 To start using the collector, follow these simple steps:
 
@@ -127,7 +127,7 @@ use `minikube` for local development.
 - [Docker](https://www.docker.com/) v20.10+
 - [minikube](https://minikube.sigs.k8s.io/docs/) v1.18+
 - [kubectl](https://kubernetes.io/docs/tasks/tools/#kubectl) v1.18+
-- [Helm](https://helm.sh/) v3.9.0+
+- [Helm](https://helm.sh/) v3.5.0+
 - [golangci-lint](https://golangci-lint.run/) v1.35+
 
 ### Server-Side Notes

@@ -16,10 +16,9 @@ rules:
 {{ else -}}
       {{ $resources := list "apiservices" "analysistemplates" "clusteranalysistemplates" "clusterroles" "clusterrolebindings" "configmaps" "controllerrevisions" "cronjobs" "csinodes" "customresourcedefinitions" "daemonsets" "deployments" "endpoints" "endpointslices" "flowschemas" "ingresses" "jobs" "leases" "namespaces" "networkpolicies" "nodes" "persistentvolumeclaims" "persistentvolumes" "pods" "priorityclasses" "prioritylevelconfigurations" "replicasets" "replicationcontrollers" "roles" "rolebindings" "rollouts" "rollouts/finalizers" "rollouts/status" "serviceaccounts" "services" "services/status" "statefulsets" "storageclasses" }}
       {{- range $i, $name := $resources }}
-        {{- if has $name $.Values.removeTypes }}
-          {{- continue -}}
-        {{- end }}
+        {{- if not (has $name $.Values.removeTypes) }}
       - {{ $name }}
+        {{ end -}}
       {{ end -}}
       {{- range $i, $name := $.Values.addTypes }}
       - {{ $name }}
